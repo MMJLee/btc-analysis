@@ -120,7 +120,6 @@ func getCandlesticks() ([]Candlestick, error) {
 		fmt.Println("Request failed with status:", resp.StatusCode)
 		panic(body)
 	}
-	fmt.Printf("%+v\n", body)
 
 	var candlesticks map[string][]Candlestick
 	err = json.Unmarshal([]byte(body), &candlesticks)
