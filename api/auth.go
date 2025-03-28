@@ -14,7 +14,7 @@ type APIKeyClaims struct {
 	URI string `json:"uri"`
 }
 
-func BuildJWT() (string, error) {
+func BuildJWT(requestMethod, requestHost, requestPath string) (string, error) {
 	uri := fmt.Sprintf("%s %s%s", requestMethod, requestHost, requestPath)
 
 	block, _ := pem.Decode([]byte(keySecret))
