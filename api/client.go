@@ -7,16 +7,13 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strconv"
 
 	"mjlee.dev/btc-analysis/util"
 )
 
 type APIClient struct {
 	*http.Client
-	Host string
 }
-
 type Candlestick struct {
 	Start  util.StringUInt64  `json:"Start"`
 	Low    util.StringUInt32  `json:"Low"`
@@ -43,26 +40,8 @@ func (a APIClient) NewRequest(method string, url url.URL, body io.Reader) (*http
 	return req, nil
 }
 
-func getProductCandlestickUrl(product_id string, start int64, end int64, granularity string, limit int64) url.URL {
-	params := url.Values{}
-	params.Add("start", strconv.FormatInt(start, 10))
-	params.Add("end", strconv.FormatInt(end, 10))
-	params.Add("granularity", granularity)
-	params.Add("limit", strconv.FormatInt(limit, 10))
-
-	requestHost := "api.coinbase.com"
-	requestPath := fmt.Sprintf("/api/v3/brokerage/products/%s/candles", product_id)
-
-	return url.URL{
-		Scheme:   "https",
-		Host:     requestHost,
-		Path:     requestPath,
-		RawQuery: params.Encode(),
-	}
-}
-
-func (a APIClient) GetCandlesticks(product_id string, start int64, end int64, granularity string, limit int64) ([]Candlestick, error) {
-	candlestick_url := getProductCandlestickUrl(product_id, start, end, granularity, limit)
+func (a *APIClient) GetCandlesticks(product_id string, start int64, end int64, granularity string, limit int64) ([]Candlestick, error) {
+	candlestick_url := util.GetProductCandlestickUrl(product_id, start, end, granularity, limit)
 	fmt.Printf("Encoded URL is %q\n", candlestick_url.String())
 	req, err := a.NewRequest("GET", candlestick_url, nil)
 	if err != nil {
