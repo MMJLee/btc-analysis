@@ -20,7 +20,7 @@ import (
 //	}
 
 func main() {
-	client := api.APIClient{Client: &http.Client{}, Host: "api.coinbase.com"}
+	client := api.APIClient{Client: &http.Client{}}
 	candlesticks, err := client.GetCandlesticks("BTC-USD", 1735711200, 1735711320, "ONE_MINUTE", 2)
 	if err != nil {
 		log.Fatal(err)
