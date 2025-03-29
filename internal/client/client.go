@@ -1,4 +1,4 @@
-package api
+package client
 
 import (
 	"encoding/json"
@@ -8,7 +8,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"mjlee.dev/btc-analysis/util"
+	"mjlee.dev/btc-analysis/api"
+	"mjlee.dev/btc-analysis/internal/util"
 )
 
 type APIClient struct {
@@ -29,7 +30,7 @@ func (a APIClient) NewRequest(method string, url url.URL, body io.Reader) (*http
 		log.Fatal(err)
 	}
 
-	jwt, err := BuildJWT(method, url.Host, url.Path)
+	jwt, err := api.BuildJWT(method, url.Host, url.Path)
 	if err != nil {
 		log.Fatal("error building jwt: %v", err)
 	}
@@ -42,7 +43,7 @@ func (a APIClient) NewRequest(method string, url url.URL, body io.Reader) (*http
 
 func (a *APIClient) GetCandlesticks(product_id string, start int64, end int64, granularity string, limit int64) ([]Candlestick, error) {
 	candlestick_url := util.GetProductCandlestickUrl(product_id, start, end, granularity, limit)
-	fmt.Printf("Encoded URL is %q\n", candlestick_url.String())
+	// fmt.Printf("Encoded URL is %q\n", candlestick_url.String())
 	req, err := a.NewRequest("GET", candlestick_url, nil)
 	if err != nil {
 		log.Fatal(err)
