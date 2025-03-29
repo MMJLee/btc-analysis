@@ -17,7 +17,8 @@ type APIKeyClaims struct {
 func BuildJWT(requestMethod, requestHost, requestPath string) (string, error) {
 	uri := fmt.Sprintf("%s %s%s", requestMethod, requestHost, requestPath)
 
-	block, _ := pem.Decode([]byte(keySecret))
+	// block, _ := pem.Decode([]byte(os.Getenv("COINBASE_API_KEY_SECRET")))
+	block, _ := pem.Decode([]byte(COINBASE_API_KEY_SECRET))
 	if block == nil {
 		return "", fmt.Errorf("jwt: Could not decode private key")
 	}
@@ -29,8 +30,9 @@ func BuildJWT(requestMethod, requestHost, requestPath string) (string, error) {
 
 	claims := &APIKeyClaims{
 		&jwt.RegisteredClaims{
-			Issuer:    "cdp",
-			Subject:   keyName,
+			Issuer: "cdp",
+			// Subject:   os.Getenv("COINBASE_API_KEY_NAME"),
+			Subject:   COINBASE_API_KEY_NAME,
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(2 * time.Minute)),
 		}, uri,
@@ -38,7 +40,8 @@ func BuildJWT(requestMethod, requestHost, requestPath string) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
 	token.Header["typ"] = "JWT"
-	token.Header["kid"] = keyName
+	// token.Header["kid"] = os.Getenv("COINBASE_API_KEY_NAME")
+	token.Header["kid"] = COINBASE_API_KEY_NAME
 
 	jwtString, err := token.SignedString(key)
 	if err != nil {
