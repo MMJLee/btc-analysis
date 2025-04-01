@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/jackc/pgx/v5"
 	"mjlee.dev/btc-analysis/api"
 	"mjlee.dev/btc-analysis/internal/util"
 )
@@ -15,24 +17,16 @@ import (
 type APIClient struct {
 	*http.Client
 }
-type Candlestick struct {
-	Start  util.StringUInt64  `json:"Start"`
-	Low    util.StringUInt32  `json:"Low"`
-	High   util.StringUInt32  `json:"High"`
-	Open   util.StringUInt32  `json:"Open"`
-	Close  util.StringUInt32  `json:"Close"`
-	Volume util.StringFloat32 `json:"Volume"`
-}
 
 func (a APIClient) NewRequest(method string, url url.URL, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest(method, url.String(), body)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error: NewRequest-NewRequest: %v", err)
 	}
 
 	jwt, err := api.BuildJWT(method, url.Host, url.Path)
 	if err != nil {
-		log.Fatal("error building jwt: %v", err)
+		log.Fatalf("Error: NewRequest-BuildJWT: %v", err)
 	}
 
 	bearer := "Bearer " + jwt
@@ -41,23 +35,22 @@ func (a APIClient) NewRequest(method string, url url.URL, body io.Reader) (*http
 	return req, nil
 }
 
-func (a *APIClient) GetCandlesticks(product_id string, start int64, end int64, granularity string, limit int64) ([]Candlestick, error) {
-	candlestick_url := util.GetProductCandlestickUrl(product_id, start, end, granularity, limit)
-	// fmt.Printf("Encoded URL is %q\n", candlestick_url.String())
-	req, err := a.NewRequest("GET", candlestick_url, nil)
+func (a *APIClient) GetCandles(product_id string, start int64, end int64, granularity string, limit int) (util.CandleResponse, error) {
+	candle_url := util.GetProductCandleUrl(product_id, start, end, granularity, limit)
+	req, err := a.NewRequest("GET", candle_url, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error: GetCandles-NewRequest: %v", err)
 	}
 
 	resp, err := a.Client.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error: GetCandles-Do: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error: GetCandles-ReadAll: %v", err)
 	}
 
 	if resp.StatusCode == 200 {
@@ -67,10 +60,28 @@ func (a *APIClient) GetCandlesticks(product_id string, start int64, end int64, g
 		panic(body)
 	}
 
-	var candlesticks map[string][]Candlestick
-	err = json.Unmarshal([]byte(body), &candlesticks)
+	var candles_response util.CandleResponse
+
+	err = json.Unmarshal([]byte(body), &candles_response)
 	if err != nil {
-		log.Fatalf("Error unmarshaling JSON: %v", err)
+		log.Fatalf("Error: GetCandles-Unmarshal: %v", err)
 	}
-	return candlesticks["candles"], nil
+
+	return candles_response, nil
+}
+
+func LogCandles(ctx context.Context, conn *pgx.Conn, a *APIClient, product_id string, start int64, end int64, granularity string, limit int) {
+	candles_response, err := a.GetCandles(product_id, start, end, granularity, limit)
+	if err != nil {
+		log.Fatalf("Error: LogCandles-GetCandles: %v", err)
+	}
+	_, err = conn.CopyFrom(
+		ctx,
+		pgx.Identifier{"candle_one_minute"},
+		[]string{"ticker", "start", "open", "high", "low", "close", "volume"},
+		&candles_response.Candles,
+	)
+	if err != nil {
+		log.Fatalf("Error: LogCandles-CopyFrom: %v", err)
+	}
 }
