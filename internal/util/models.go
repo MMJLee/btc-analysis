@@ -37,50 +37,44 @@ type Candle struct {
 	Volume string      `json:"volume"`
 }
 
-type CandleWithTicker struct {
-	Ticker string      `json:"ticker"`
-	Start  StringInt64 `json:"start"`
-	Open   string      `json:"open"`
-	High   string      `json:"high"`
-	Low    string      `json:"low"`
-	Close  string      `json:"close"`
-	Volume string      `json:"volume"`
-}
-
 type CandleSlice []Candle
 
+type CandleSliceWithTicker struct {
+	Ticker string `json:"ticker"`
+	CandleSlice
+}
 type CandleResponse struct {
 	Candles CandleSlice `json:"candles"`
 }
 
-func (c *CandleSlice) Data() any {
+func (c *CandleSliceWithTicker) Data() any {
 	return *c
 }
 
-func (c *CandleSlice) Err() error {
+func (c *CandleSliceWithTicker) Err() error {
 	return nil
 }
 
-func (c *CandleSlice) Next() bool {
-	if len(*c) > 0 {
-		return true
+func (c *CandleSliceWithTicker) Next() bool {
+	if len(c.CandleSlice) == 0 {
+		return false
 	}
-	return false
+	return true
 }
 
-func (c *CandleSlice) Values() ([]any, error) {
-	if len(*c) > 0 {
-		candle := (*c)[0]
-		*c = (*c)[1:]
-		return []any{
-			"BTC-USD",
-			candle.Start.Int64(),
-			candle.Open,
-			candle.High,
-			candle.Low,
-			candle.Close,
-			candle.Volume,
-		}, nil
+func (c *CandleSliceWithTicker) Values() ([]any, error) {
+	if len(c.CandleSlice) == 0 {
+		return nil, fmt.Errorf("Error: CandleSlice-Values")
 	}
-	return nil, fmt.Errorf("Error: CandleSlice-Values")
+	candle := (c.CandleSlice)[0]
+	*&c.CandleSlice = (c.CandleSlice[1:])
+	return []any{
+		c.Ticker,
+		candle.Start.Int64(),
+		candle.Open,
+		candle.High,
+		candle.Low,
+		candle.Close,
+		candle.Volume,
+	}, nil
 }
