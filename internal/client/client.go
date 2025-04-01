@@ -79,7 +79,7 @@ func LogCandles(ctx context.Context, conn *pgx.Conn, a *APIClient, product_id st
 		ctx,
 		pgx.Identifier{"candle_one_minute"},
 		[]string{"ticker", "start", "open", "high", "low", "close", "volume"},
-		&candles_response.Candles,
+		&util.CandleSliceWithTicker{Ticker: product_id, CandleSlice: candles_response.Candles},
 	)
 	if err != nil {
 		log.Fatalf("Error: LogCandles-CopyFrom: %v", err)
