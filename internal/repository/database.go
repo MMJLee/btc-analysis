@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"log"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"mjlee.dev/btc-analysis/internal/util"
 )
 
 type DBTX interface {
@@ -24,5 +26,27 @@ type Queries struct {
 func (q *Queries) WithTx(tx pgx.Tx) *Queries {
 	return &Queries{
 		db: tx,
+	}
+}
+
+func CreateStagingTable() {
+
+}
+
+func DropStagingTable() {
+
+}
+
+func InsertFromStagingTable() {
+
+}
+
+func (q *Queries) CreateStagingTable(ctx context.Context, ticker string, arg util.Candle) {
+	create_table_query := `
+		CREATE TABLE IF NOT EXISTS staging_candle_one_minute (LIKE candle_one_minute INCLUDING ALL);
+	`
+	_, err := q.db.Exec(ctx, create_table_query)
+	if err != nil {
+		log.Fatalf("Error: Repository-CreateStagingTable-Exec: %v", err)
 	}
 }

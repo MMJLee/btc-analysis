@@ -13,17 +13,6 @@ import (
 	"mjlee.dev/btc-analysis/internal/client"
 )
 
-// 	now := time.Now().Unix()
-// 	if start > now {
-// 		return nil, fmt.Errorf("Error: candlestick time is in the future data")
-// 	}
-
-// granularities := []string{"ONE_MINUTE", "FIVE_MINUTE", "FIFTEEN_MINUTE", "THIRTY_MINUTE", "ONE_HOUR", "TWO_HOUR", "SIX_HOUR", "ONE_DAY"}
-//
-//	if !slices.Contains(granularities, granularity) {
-//		granularity = "UNKNOWN_GRANULARITY"
-//	}
-
 func handle(w http.ResponseWriter, r *http.Request) {
 	log.Println("reasdfasdf")
 	w.Write([]byte("hohoh"))
@@ -57,7 +46,7 @@ func main() {
 
 	api_client := client.APIClient{Client: &http.Client{}}
 
-	limit := 2
+	limit := 350
 	end := time.Now().Unix()
 	start := time.Now().Add(time.Duration(-limit) * time.Minute).Unix()
 
@@ -67,5 +56,4 @@ func main() {
 		client.LogCandles(ctx, conn, &api_client, "BTC-USD", start, end, "ONE_MINUTE", limit)
 	}()
 	wg.Wait()
-
 }
