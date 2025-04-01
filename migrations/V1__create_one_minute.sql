@@ -6,7 +6,8 @@ CREATE TABLE candle_one_minute (
     high DECIMAL(18, 8) NOT NULL,
     low DECIMAL(18, 8) NOT NULL,
     "close" DECIMAL(18, 8) NOT NULL,
-    volume DOUBLE PRECISION NOT NULL
+    volume DOUBLE PRECISION NOT NULL,
+    created_on TIMESTAMPTZ NOT NULL DEFAULT current_timestamp
 );
 
 ALTER TABLE
