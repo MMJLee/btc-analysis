@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -24,14 +24,14 @@ import (
 //		granularity = "UNKNOWN_GRANULARITY"
 //	}
 
-type RecipesHandler struct{}
-
-func (h *RecipesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("This is my recipe page"))
+func handle(w http.ResponseWriter, r *http.Request) {
+	log.Println("reasdfasdf")
+	w.Write([]byte("hohoh"))
 }
 
 func main() {
 	ctx := context.Background()
+	var wg sync.WaitGroup
 
 	conn, err := pgx.Connect(context.Background(), api.DATABASE_CONNECTION_STRING)
 	// conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_CONNECTION_STRING"))
@@ -39,25 +39,33 @@ func main() {
 		os.Exit(1)
 	}
 	defer conn.Close(ctx)
-
 	// data.getCandlesticks(conn, ctx)
 
-	mux := http.NewServeMux()
-	mux.Handle("/recipes/", &RecipesHandler{})
-	go http.ListenAndServe("localhost:8080", mux)
+	// router := http.NewServeMux()
+	// router.HandleFunc("GET /candle/{product_id}", handle)
+	// router.HandleFunc("POST /candle/{product_id}", handle)
+	// router.HandleFunc("PUT /candle/{product_id}", handle)
+	// router.HandleFunc("PATCH /candle/{product_id}", handle)
+	// router.HandleFunc("DELETE /candle/{product_id}", handle)
+	// router.HandleFunc("OPTIONS /candle/{product_id}", handle)
 
-	client := client.APIClient{Client: &http.Client{}}
+	// server := http.Server{
+	// 	Addr:    "localhost:8080",
+	// 	Handler: Logging(router),
+	// }
+	// server.ListenAndServe()
 
-	start := time.Now().Add(time.Duration(-24) * time.Hour).Unix()
-	fmt.Println(start)
-	end := time.Unix(start, 0).Add(time.Duration(350) * time.Minute).Unix()
-	fmt.Println(end)
-	// go client.logCandlesticks(("BTC-USD", start, end, "ONE_MINUTE", 10))
-	candlesticks, err := client.GetCandlesticks("BTC-USD", start, end, "ONE_MINUTE", 350)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, candlestick := range candlesticks {
-		fmt.Printf("%+v\n", candlestick)
-	}
+	api_client := client.APIClient{Client: &http.Client{}}
+
+	limit := 2
+	end := time.Now().Unix()
+	start := time.Now().Add(time.Duration(-limit) * time.Minute).Unix()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		client.LogCandles(ctx, conn, &api_client, "BTC-USD", start, end, "ONE_MINUTE", limit)
+	}()
+	wg.Wait()
+
 }
