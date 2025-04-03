@@ -7,6 +7,9 @@ import (
 )
 
 func GetProductCandleUrl(product_id string, start int64, end int64, granularity string, limit int) url.URL {
+	if !ValidateGranularity(granularity) {
+		granularity = "UNKNOWN_GRANULARITY"
+	}
 	params := url.Values{}
 	params.Add("start", strconv.FormatInt(start, 10))
 	params.Add("end", strconv.FormatInt(end, 10))

@@ -47,6 +47,6 @@ func (q *Queries) CreateStagingTable(ctx context.Context, ticker string, arg uti
 	`
 	_, err := q.db.Exec(ctx, create_table_query)
 	if err != nil {
-		log.Fatalf("Error: Repository-CreateStagingTable-Exec: %v", err)
+		log.Panicf("Error: Repository-CreateStagingTable-Exec: %v", err)
 	}
 }
