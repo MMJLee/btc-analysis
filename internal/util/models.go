@@ -1,7 +1,5 @@
 package util
 
-type StringInt64 int64
-
 type Candle struct {
 	Ticker string `json:"ticker"`
 	Start  string `json:"start"`

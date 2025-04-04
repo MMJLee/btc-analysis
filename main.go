@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -40,7 +41,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		candles_response, err := api_client.GetCandles(product_id, start, end, granularity, limit)
+		candles_response, err := api_client.GetCandles(product_id, strconv.FormatInt(start, 10), strconv.FormatInt(end, 10), granularity, strconv.Itoa(limit))
 		if err != nil {
 			log.Panicf("Error: Main-GetCandles: %v", err)
 		}
@@ -50,13 +51,13 @@ func main() {
 			[]string{"ticker", "start", "open", "high", "low", "close", "volume"},
 			&util.CandleSliceWithTicker{Ticker: product_id, CandleSlice: candles_response.Candles},
 		)
-		// if err != nil {
-		// 	log.Panicf("Error: Client-LogCandles-CopyFrom: %v", err)
-		// }
+		if err != nil {
+			log.Panicf("Error: Client-LogCandles-CopyFrom: %v", err)
+		}
 	}()
 
 	router := http.NewServeMux()
-	router.HandleFunc("GET /candle/{product_id}", handle)
+	router.HandleFunc("GET /candle/{product_id}", api.HandleCandle)
 	router.HandleFunc("POST /candle/{product_id}", handle)
 	router.HandleFunc("OPTIONS /candle/{product_id}", handle)
 

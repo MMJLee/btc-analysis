@@ -3,18 +3,14 @@ package util
 import (
 	"fmt"
 	"net/url"
-	"strconv"
 )
 
-func GetProductCandleUrl(product_id string, start int64, end int64, granularity string, limit int) url.URL {
-	if !ValidateGranularity(granularity) {
-		granularity = "UNKNOWN_GRANULARITY"
-	}
+func GetProductCandleUrl(product_id, start, end, granularity, limit string) url.URL {
 	params := url.Values{}
-	params.Add("start", strconv.FormatInt(start, 10))
-	params.Add("end", strconv.FormatInt(end, 10))
+	params.Add("start", start)
+	params.Add("end", start)
 	params.Add("granularity", granularity)
-	params.Add("limit", strconv.Itoa(limit))
+	params.Add("limit", limit)
 
 	requestHost := "api.coinbase.com"
 	requestPath := fmt.Sprintf("/api/v3/brokerage/products/%s/candles", product_id)
