@@ -4,67 +4,34 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"mjlee.dev/btc-analysis/api"
-	"mjlee.dev/btc-analysis/internal/client"
-	"mjlee.dev/btc-analysis/internal/util"
+	"github.com/mmjlee/btc-analysis/api"
+	"github.com/mmjlee/btc-analysis/internal/client"
+	"github.com/mmjlee/btc-analysis/internal/repository"
+	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
-func handle(w http.ResponseWriter, r *http.Request) {
-	time.Sleep(100 * time.Millisecond)
-	w.Write([]byte("hohoh"))
-}
+func test(ctx context.Context) {
+	candle_pool, err := repository.NewCandlePool(ctx)
+	defer candle_pool.Pool.Close()
 
-func main() {
-	ctx := context.Background()
-	var wg sync.WaitGroup
-
-	conn, err := pgx.Connect(context.Background(), api.DATABASE_CONNECTION_STRING)
-	// conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_CONNECTION_STRING"))
 	if err != nil {
-		os.Exit(1)
+		log.Panicf("Error: Main: %v", err)
 	}
-	defer conn.Close(ctx)
-
-	api_client := client.APIClient{Client: &http.Client{}}
-	product_id := "BTC-USD"
-	limit := 1
-	end := time.Now().Unix()
-	start := time.Now().Add(time.Duration(-limit) * time.Minute).Unix()
-	granularity := "ONE_MINUTE"
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		candles_response, err := api_client.GetCandles(product_id, strconv.FormatInt(start, 10), strconv.FormatInt(end, 10), granularity, strconv.Itoa(limit))
-		if err != nil {
-			log.Panicf("Error: Main-GetCandles: %v", err)
-		}
-		_, err = conn.CopyFrom(
-			ctx,
-			pgx.Identifier{"candle_one_minute"},
-			[]string{"ticker", "start", "open", "high", "low", "close", "volume"},
-			&util.CandleSliceWithTicker{Ticker: product_id, CandleSlice: candles_response.Candles},
-		)
-		if err != nil {
-			log.Panicf("Error: Client-LogCandles-CopyFrom: %v", err)
-		}
-	}()
+	candle_handler := api.NewCandleHandler(candle_pool)
 
 	router := http.NewServeMux()
-	router.HandleFunc("GET /candle/{product_id}", api.HandleCandle)
-	router.HandleFunc("POST /candle/{product_id}", handle)
-	router.HandleFunc("OPTIONS /candle/{product_id}", handle)
+	router.HandleFunc("GET /candle/{product_id}", candle_handler.GetProduct)
+	router.HandleFunc("POST /candle/{product_id}", candle_handler.GetProduct)
+	router.HandleFunc("OPTIONS /candle/{product_id}", candle_handler.GetProduct)
 
 	admin_router := http.NewServeMux()
-	admin_router.HandleFunc("PUT /candle/{product_id}", handle)
-	admin_router.HandleFunc("PATCH /candle/{product_id}", handle)
-	admin_router.HandleFunc("DELETE /candle/{product_id}", handle)
+	admin_router.HandleFunc("PUT /candle/{product_id}", candle_handler.GetProduct)
+	admin_router.HandleFunc("PATCH /candle/{product_id}", candle_handler.GetProduct)
+	admin_router.HandleFunc("DELETE /candle/{product_id}", candle_handler.GetProduct)
 	router.Handle("/", util.AuthMiddleware(admin_router))
 
 	v1 := http.NewServeMux()
@@ -82,5 +49,49 @@ func main() {
 		Handler: middlewares(v1),
 	}
 	server.ListenAndServe()
+}
+
+func main() {
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		test(ctx)
+	}()
+
+	// conn, err := pgx.Connect(ctx, os.Getenv("DATABASE_CONNECTION_STRING"))
+
+	conn, err := repository.NewCandleConn(ctx)
+	defer conn.Conn.Close(ctx)
+
+	if err != nil {
+		log.Panicf("Error: Main: %v", err)
+	}
+	candle_logger := client.GetNewAPIClient()
+
+	product_id := "BTC-USD"
+	limit := 1
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			now := time.Now().Truncate(time.Minute)
+			start := now.Add(time.Duration(-limit) * time.Minute).Unix()
+			end := now.Add(time.Duration(-limit) * time.Second).Unix()
+
+			candles_response, err := candle_logger.GetCandles(product_id, strconv.FormatInt(start, 10), strconv.FormatInt(end, 10), strconv.Itoa(limit))
+			if err != nil {
+				log.Panicf("Error: Main-GetCandles: %v", err)
+			}
+
+			if err := conn.CopyCandles(product_id, candles_response.Candles); err != nil {
+				log.Panicf("Error: Client-LogCandles-CopyFrom: %v", err)
+			}
+			time.Sleep(time.Duration(70) * time.Second)
+		}
+	}()
+
 	wg.Wait()
 }

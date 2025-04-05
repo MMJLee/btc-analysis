@@ -6,11 +6,15 @@ import (
 	"net/http"
 	"net/url"
 
-	"mjlee.dev/btc-analysis/api"
+	"github.com/mmjlee/btc-analysis/api"
 )
 
 type APIClient struct {
 	*http.Client
+}
+
+func GetNewAPIClient() APIClient {
+	return APIClient{&http.Client{}}
 }
 
 func (a APIClient) NewRequest(method string, url url.URL, body io.Reader) (*http.Request, error) {

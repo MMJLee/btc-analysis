@@ -5,11 +5,11 @@ import (
 	"io"
 	"log"
 
-	"mjlee.dev/btc-analysis/internal/util"
+	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
-func (a *APIClient) GetCandles(product_id, start, end, granularity, limit string) (util.CandleResponse, error) {
-	candle_url := util.GetProductCandleUrl(product_id, start, end, granularity, limit)
+func (a *APIClient) GetCandles(product_id, start, end, limit string) (util.CandleResponse, error) {
+	candle_url := util.GetProductCandleUrl(product_id, start, end, "ONE_MINUTE", limit)
 	req, err := a.NewRequest("GET", candle_url, nil)
 	if err != nil {
 		log.Panicf("Error: Client-GetCandles-NewRequest: %v", err)
@@ -38,6 +38,5 @@ func (a *APIClient) GetCandles(product_id, start, end, granularity, limit string
 	if err != nil {
 		log.Panicf("Error: Client-GetCandles-Unmarshal: %v", err)
 	}
-
 	return candles_response, nil
 }

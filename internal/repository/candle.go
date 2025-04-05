@@ -2,71 +2,84 @@ package repository
 
 import (
 	"context"
+	"log"
 
-	"mjlee.dev/btc-analysis/internal/util"
+	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
-func (q *Queries) Create(ctx context.Context, ticker string, arg util.Candle) (util.Candle, error) {
-	create_candle_query := `
-		INSERT INTO candle_one_minute (ticker, "start", "open", high, low, "close", volume)
-		VALUES ($1, $2, $3, $4, $5, $6, $7) 
-		ON CONFLICT ON CONSTRAINT candle_one_minute_pk DO UPDATE SET
-			high = EXCLUDED.high,
-			low = EXCLUDED.low,
-			"close" = EXCLUDED.close,
-			volume = EXCLUDED.volume
-		RETURNING ticker, "start", "open", high, low, "close", volume
-	`
-	row := q.db.QueryRow(ctx, create_candle_query, ticker, arg.Start, arg.Open, arg.High, arg.Low, arg.Close, arg.Volume)
-	var c util.Candle
-	err := row.Scan(
-		&c.Ticker,
-		&c.Start,
-		&c.Open,
-		&c.High,
-		&c.Low,
-		&c.Close,
-		&c.Volume,
-	)
-	return c, err
+type CandlePool struct {
+	context.Context
+	*pgxpool.Pool
 }
 
-func (q *Queries) Read(ctx context.Context, ticker string, arg util.Candle) (util.Candle, error) {
-	create_candle_query := `
-		SELECT ticker, "start", "open", high, low, "close", volume
-		FROM candle_one_minute 
-		WHERE ticker = $1 AND "start" = $2
-	`
-	row := q.db.QueryRow(ctx, create_candle_query, ticker, arg.Start)
-	var c util.Candle
-	err := row.Scan(
-		&c.Ticker,
-		&c.Start,
-		&c.Open,
-		&c.High,
-		&c.Low,
-		&c.Close,
-		&c.Volume,
-	)
-	return c, err
+func NewCandlePool(ctx context.Context) (CandlePool, error) {
+	pool, err := pgxpool.New(ctx, util.DATABASE_CONNECTION_STRING)
+	if err != nil {
+		return CandlePool{}, err
+	}
+	return CandlePool{Context: ctx, Pool: pool}, err
 }
 
-func (q *Queries) ReadList(ctx context.Context, ticker string, arg util.Candle) (util.Candle, error) {
-	create_candle_query := `
-		SELECT ticker, "start", "open", high, low, "close", volume
-		FROM candle_one_minute 
-		WHERE ticker = $1 AND "start" = $2
-	`
-	row := q.db.QueryRow(ctx, create_candle_query, ticker, arg.Start)
-	var c util.Candle
-	err := row.Scan(
-		&c.Ticker,
-		&c.Start,
-		&c.Open,
-		&c.High,
-		&c.Low,
-		&c.Close,
-		&c.Volume,
-	)
-	return c, err
+func (repo CandlePool) GetCandles(product_id string, start, end int64) (util.CandleSlice, error) {
+	rows, _ := repo.Pool.Query(repo.Context, "")
+	candles, err := pgx.CollectRows(rows, pgx.RowToStructByName[util.Candle])
+	if err != nil {
+		log.Panicf("Error: Repository-Candle-GetCandles: %v", err)
+	}
+	return candles, nil
 }
+
+type CandleConn struct {
+	context.Context
+	*pgx.Conn
+}
+
+func NewCandleConn(ctx context.Context) (CandleConn, error) {
+	conn, err := pgx.Connect(ctx, util.DATABASE_CONNECTION_STRING)
+	if err != nil {
+		return CandleConn{}, err
+	}
+	pgxdecimal.Register(conn.TypeMap())
+	return CandleConn{Context: ctx, Conn: conn}, nil
+}
+
+func (repo CandleConn) CopyCandles(product_id string, candles util.CandleSlice) error {
+	_, err := repo.Conn.CopyFrom(
+		repo.Context,
+		pgx.Identifier{"candle_one_minute"},
+		[]string{"ticker", "start", "open", "high", "low", "close", "volume"},
+		&util.CandleSliceWithTicker{Ticker: product_id, CandleSlice: candles},
+	)
+	return err
+}
+
+// CreateUser creates a new user in the db..
+// func (repo *CandlePool) CreateUser(candle util.Candle) (util.Candle, error) {
+// 	test := [...]string{"h", "o", "h"}
+// 	create_candle_query := `
+// 		INSERT INTO candle_one_minute (ticker, "start", "open", high, low, "close", volume)
+// 		VALUES ($1, $2, $3, $4, $5, $6, $7)
+// 		ON CONFLICT ON CONSTRAINT candle_one_minute_pk DO UPDATE SET
+// 			high = EXCLUDED.high,
+// 			low = EXCLUDED.low,
+// 			"close" = EXCLUDED.close,
+// 			volume = EXCLUDED.volume
+// 		RETURNING ticker, "start", "open", high, low, "close", volume
+// 	`
+// 	_, err := repo.Pool.Exec(repo.Context, create_candle_query, test)
+
+// 	result := repo.db.Create(&candle)
+// 	if result.Error != nil {
+// 		return nil, result.Error
+// 	}
+// 	return &domain.User{
+// 		ID:        dbUser.ID,
+// 		Username:  dbUser.Username,
+// 		Password:  dbUser.Password,
+// 		CreatedAt: dbUser.CreatedAt,
+// 		UpdatedAt: dbUser.UpdatedAt,
+// 	}, nil
+// }
