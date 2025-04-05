@@ -8,7 +8,7 @@ import (
 func GetProductCandleUrl(product_id, start, end, granularity, limit string) url.URL {
 	params := url.Values{}
 	params.Add("start", start)
-	params.Add("end", start)
+	params.Add("end", end)
 	params.Add("granularity", granularity)
 	params.Add("limit", limit)
 
