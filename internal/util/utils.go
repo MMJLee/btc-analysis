@@ -4,6 +4,7 @@ import (
 	"fmt"
 )
 
+// custom implementation for the pgx CopyFrom
 func (c *CandleSliceWithTicker) Data() any {
 	return *c
 }

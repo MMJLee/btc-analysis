@@ -3,16 +3,21 @@ package repository
 import (
 	"context"
 	"log"
+	"os"
 
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
-
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
 func Config() *pgxpool.Config {
-	dbConfig, err := pgxpool.ParseConfig(util.DATABASE_CONNECTION_STRING)
+	conn_string := os.Getenv("DATABASE_CONNECTION_STRING")
+	if conn_string == "" {
+		conn_string = util.DATABASE_CONNECTION_STRING
+	}
+
+	dbConfig, err := pgxpool.ParseConfig(conn_string)
 	if err != nil {
 		log.Panicf("Error: Repository-Config: %v", err)
 	}
@@ -42,7 +47,11 @@ type CandleConn struct {
 }
 
 func NewCandleConn(ctx context.Context) CandleConn {
-	conn, err := pgx.Connect(ctx, util.DATABASE_CONNECTION_STRING)
+	conn_string := os.Getenv("DATABASE_CONNECTION_STRING")
+	if conn_string == "" {
+		conn_string = util.DATABASE_CONNECTION_STRING
+	}
+	conn, err := pgx.Connect(ctx, conn_string)
 	if err != nil {
 		log.Panicf("Error: Repository-NewCandleConn: %v", err)
 	}
