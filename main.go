@@ -14,29 +14,18 @@ import (
 	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
-func test(ctx context.Context) {
-	candle_pool, err := repository.NewCandlePool(ctx)
-	defer candle_pool.Pool.Close()
-
-	if err != nil {
-		log.Panicf("Error: Main: %v", err)
-	}
-	candle_handler := api.NewCandleHandler(candle_pool)
-
+func getServer(c api.CandleHandler) http.Server {
 	router := http.NewServeMux()
-	router.HandleFunc("GET /candle/{product_id}", candle_handler.GetProduct)
-	router.HandleFunc("POST /candle/{product_id}", candle_handler.GetProduct)
-	router.HandleFunc("OPTIONS /candle/{product_id}", candle_handler.GetProduct)
-
+	router.HandleFunc("GET /candle/{ticker}", c.GetCandles)
+	router.HandleFunc("POST /candle/{ticker}", c.GetCandles)
+	router.HandleFunc("OPTIONS /candle/{ticker}", c.Options)
 	admin_router := http.NewServeMux()
-	admin_router.HandleFunc("PUT /candle/{product_id}", candle_handler.GetProduct)
-	admin_router.HandleFunc("PATCH /candle/{product_id}", candle_handler.GetProduct)
-	admin_router.HandleFunc("DELETE /candle/{product_id}", candle_handler.GetProduct)
+	admin_router.HandleFunc("PUT /candle/{ticker}", c.GetCandles)
+	admin_router.HandleFunc("PATCH /candle/{ticker}", c.GetCandles)
+	admin_router.HandleFunc("DELETE /candle/{ticker}", c.GetCandles)
 	router.Handle("/", util.AuthMiddleware(admin_router))
-
 	v1 := http.NewServeMux()
 	v1.Handle("/v1/", http.StripPrefix("/v1", router))
-
 	middlewares := util.CreateStack(
 		util.GzipMiddleware,
 		util.CORSMiddleware,
@@ -44,35 +33,23 @@ func test(ctx context.Context) {
 		util.LoggingMiddleware,
 	)
 
-	server := http.Server{
+	return http.Server{
 		Addr:    "localhost:8080",
 		Handler: middlewares(v1),
 	}
-	server.ListenAndServe()
 }
 
 func main() {
 	ctx := context.Background()
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		test(ctx)
-	}()
 
-	// conn, err := pgx.Connect(ctx, os.Getenv("DATABASE_CONNECTION_STRING"))
-
-	conn, err := repository.NewCandleConn(ctx)
+	// goroutine to log data from coinbase api to postgres db
+	// runs forever and triggers every 30 seconds
+	conn := repository.NewCandleConn(ctx)
 	defer conn.Conn.Close(ctx)
-
-	if err != nil {
-		log.Panicf("Error: Main: %v", err)
-	}
 	candle_logger := client.GetNewAPIClient()
-
 	product_id := "BTC-USD"
-	limit := 1
-
+	limit := 3
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -86,12 +63,19 @@ func main() {
 				log.Panicf("Error: Main-GetCandles: %v", err)
 			}
 
-			if err := conn.CopyCandles(product_id, candles_response.Candles); err != nil {
-				log.Panicf("Error: Client-LogCandles-CopyFrom: %v", err)
+			if err := conn.InsertCandles(product_id, candles_response.Candles); err != nil {
+				log.Panicf("Error: Main-InsertCandles: %v", err)
 			}
-			time.Sleep(time.Duration(70) * time.Second)
+			time.Sleep(time.Duration(30) * time.Second)
 		}
 	}()
+
+	// serve http requests
+	candle_pool := repository.NewCandlePool(ctx)
+	defer candle_pool.Pool.Close()
+	candle_handler := api.NewCandleHandler(candle_pool)
+	server := getServer(candle_handler)
+	server.ListenAndServe()
 
 	wg.Wait()
 }
