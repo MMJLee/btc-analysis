@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -18,8 +19,11 @@ type APIKeyClaims struct {
 func BuildJWT(requestMethod, requestHost, requestPath string) (string, error) {
 	uri := fmt.Sprintf("%s %s%s", requestMethod, requestHost, requestPath)
 
-	// block, _ := pem.Decode([]byte(os.Getenv("COINBASE_API_KEY_SECRET")))
-	block, _ := pem.Decode([]byte(util.COINBASE_API_KEY_SECRET))
+	key_secret := os.Getenv("COINBASE_API_KEY_SECRET")
+	if key_secret == "" {
+		key_secret = util.COINBASE_API_KEY_SECRET
+	}
+	block, _ := pem.Decode([]byte(key_secret))
 	if block == nil {
 		return "", fmt.Errorf("jwt: Could not decode private key")
 	}
@@ -29,11 +33,15 @@ func BuildJWT(requestMethod, requestHost, requestPath string) (string, error) {
 		return "", fmt.Errorf("jwt: %w", err)
 	}
 
+	key_name := os.Getenv("COINBASE_API_KEY_NAME")
+	if key_name == "" {
+		key_name = util.COINBASE_API_KEY_NAME
+	}
+
 	claims := &APIKeyClaims{
 		&jwt.RegisteredClaims{
-			Issuer: "cdp",
-			// Subject:   os.Getenv("COINBASE_API_KEY_NAME"),
-			Subject:   util.COINBASE_API_KEY_NAME,
+			Issuer:    "cdp",
+			Subject:   key_name,
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(2 * time.Minute)),
 		}, uri,
@@ -41,8 +49,7 @@ func BuildJWT(requestMethod, requestHost, requestPath string) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
 	token.Header["typ"] = "JWT"
-	// token.Header["kid"] = os.Getenv("COINBASE_API_KEY_NAME")
-	token.Header["kid"] = util.COINBASE_API_KEY_NAME
+	token.Header["kid"] = key_name
 
 	jwtString, err := token.SignedString(key)
 	if err != nil {

@@ -44,29 +44,30 @@ func main() {
 	var wg sync.WaitGroup
 
 	// goroutine to log data from coinbase api to postgres db
-	// runs forever and triggers every 30 seconds
 	conn := repository.NewCandleConn(ctx)
 	defer conn.Conn.Close(ctx)
 	candle_logger := client.GetNewAPIClient()
-	product_id := "BTC-USD"
-	limit := 3
+	product_id, limit := "BTC-USD", 3
 	wg.Add(1)
 	go func() {
+		count := 0
 		defer wg.Done()
 		for {
-			now := time.Now().Truncate(time.Minute)
+			now := time.Now().Add(time.Duration(-limit*count) * time.Minute).Truncate(time.Minute)
 			start := now.Add(time.Duration(-limit) * time.Minute).Unix()
-			end := now.Add(time.Duration(-limit) * time.Second).Unix()
+			end := now.Add(time.Duration(-1) * time.Second).Unix()
 
 			candles_response, err := candle_logger.GetCandles(product_id, strconv.FormatInt(start, 10), strconv.FormatInt(end, 10), strconv.Itoa(limit))
 			if err != nil {
 				log.Panicf("Error: Main-GetCandles: %v", err)
 			}
-
+			// to backfill use limit=350 and time.Sleep(250ms)
+			// count++
+			// if err := conn.BulkLogCandles(product_id, candles_response.Candles); err != nil {
 			if err := conn.InsertCandles(product_id, candles_response.Candles); err != nil {
 				log.Panicf("Error: Main-InsertCandles: %v", err)
 			}
-			time.Sleep(time.Duration(30) * time.Second)
+			time.Sleep(time.Duration(10) * time.Second)
 		}
 	}()
 
