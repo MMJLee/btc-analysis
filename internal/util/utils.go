@@ -2,8 +2,6 @@ package util
 
 import (
 	"fmt"
-
-	decimal "github.com/jackc/pgx-shopspring-decimal"
 )
 
 func (c *CandleSliceWithTicker) Data() any {
@@ -29,11 +27,11 @@ func (c *CandleSliceWithTicker) Values() ([]any, error) {
 	*&c.CandleSlice = (c.CandleSlice[1:])
 	return []any{
 		c.Ticker,
-		int64(candle.Start),
-		decimal.Decimal(candle.Open),
-		decimal.Decimal(candle.High),
-		decimal.Decimal(candle.Low),
-		decimal.Decimal(candle.Close),
-		float64(candle.Volume),
+		candle.Start,
+		candle.Open,
+		candle.High,
+		candle.Low,
+		candle.Close,
+		candle.Volume,
 	}, nil
 }

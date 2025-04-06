@@ -1,30 +1,22 @@
 package repository
 
 import (
-	"context"
 	"log"
 
-	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
-type CandlePool struct {
-	context.Context
-	*pgxpool.Pool
-}
-
-func NewCandlePool(ctx context.Context) (CandlePool, error) {
-	pool, err := pgxpool.New(ctx, util.DATABASE_CONNECTION_STRING)
-	if err != nil {
-		return CandlePool{}, err
-	}
-	return CandlePool{Context: ctx, Pool: pool}, err
-}
-
-func (repo CandlePool) GetCandles(product_id string, start, end int64) (util.CandleSlice, error) {
-	rows, _ := repo.Pool.Query(repo.Context, "")
+func (repo CandlePool) GetCandles(ticker, start, end, limit, offset string) (util.CandleSlice, error) {
+	query := `
+		SELECT ticker, "start", "open", high, low, "close", volume
+		FROM candle_one_minute 
+		WHERE ticker = $1 
+		AND "start" BETWEEN $2 AND $3
+		ORDER BY ticker, "start"
+		LIMIT $4 OFFSET $5 
+	`
+	rows, _ := repo.Pool.Query(repo.Context, query, ticker, start, end, limit, offset)
 	candles, err := pgx.CollectRows(rows, pgx.RowToStructByName[util.Candle])
 	if err != nil {
 		log.Panicf("Error: Repository-Candle-GetCandles: %v", err)
@@ -32,27 +24,36 @@ func (repo CandlePool) GetCandles(product_id string, start, end int64) (util.Can
 	return candles, nil
 }
 
-type CandleConn struct {
-	context.Context
-	*pgx.Conn
-}
-
-func NewCandleConn(ctx context.Context) (CandleConn, error) {
-	conn, err := pgx.Connect(ctx, util.DATABASE_CONNECTION_STRING)
-	if err != nil {
-		return CandleConn{}, err
-	}
-	pgxdecimal.Register(conn.TypeMap())
-	return CandleConn{Context: ctx, Conn: conn}, nil
-}
-
-func (repo CandleConn) CopyCandles(product_id string, candles util.CandleSlice) error {
+func (repo CandleConn) CopyCandles(ticker string, candles util.CandleSlice) error {
 	_, err := repo.Conn.CopyFrom(
 		repo.Context,
 		pgx.Identifier{"candle_one_minute"},
 		[]string{"ticker", "start", "open", "high", "low", "close", "volume"},
-		&util.CandleSliceWithTicker{Ticker: product_id, CandleSlice: candles},
+		&util.CandleSliceWithTicker{Ticker: ticker, CandleSlice: candles},
 	)
+	return err
+}
+
+func (repo CandleConn) InsertCandles(ticker string, candles util.CandleSlice) error {
+	query := `
+		INSERT INTO candle_one_minute (ticker, "start", "open", high, low, "close", volume) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT ON CONSTRAINT candle_one_minute_pk DO UPDATE SET
+			high = EXCLUDED.high,
+			low = EXCLUDED.low,
+			"close" = EXCLUDED.close,
+			volume = EXCLUDED.volume
+		RETURNING ticker, "start", "open", high, low, "close", volume
+	`
+	batch := &pgx.Batch{}
+	for _, candle := range candles {
+		batch.Queue(query, ticker, candle.Start, candle.Open, candle.High, candle.Low, candle.Close, candle.Volume)
+	}
+	err := repo.Conn.SendBatch(repo.Context, batch).Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return err
 }
 

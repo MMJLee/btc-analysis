@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/mmjlee/btc-analysis/internal/repository"
@@ -15,9 +16,23 @@ func NewCandleHandler(repo repository.CandlePool) CandleHandler {
 	return CandleHandler{repo}
 }
 
-func (CandleHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
-	product_id := r.PathValue("product_id")
+func (c CandleHandler) Options(w http.ResponseWriter, r *http.Request) {
+	return
+}
+
+func (c CandleHandler) GetCandles(w http.ResponseWriter, r *http.Request) {
+	ticker := r.PathValue("ticker")
 	start := r.URL.Query().Get("start")
 	end := r.URL.Query().Get("end")
-	w.Write([]byte(fmt.Sprintf("%v, %v, %v", product_id, start, end)))
+	limit := r.URL.Query().Get("limit")
+	offset := r.URL.Query().Get("offset")
+	if ticker == "" || start == "" || end == "" || limit == "" || offset == "" {
+		log.Panic("Error: API-GetProduct: missing required query param")
+	}
+
+	candles, err := c.CandlePool.GetCandles(ticker, start, end, limit, offset)
+	if err != nil {
+		log.Panicf("Error: API-GetProduct-GetCandles: %v", err)
+	}
+	w.Write([]byte(fmt.Sprintf("%+v", candles)))
 }
