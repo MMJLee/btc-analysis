@@ -25,6 +25,25 @@ func (repo CandlePool) GetCandles(ticker, start, end, limit, offset string) (uti
 	return candles, nil
 }
 
+func (repo CandlePool) GetMissingCandles(ticker, start, end, limit, offset string) (util.CandleSlice, error) {
+	query := `
+		WITH tmp AS (
+			SELECT generate_series($2, $3, 60) AS "start"
+			LIMIT $4 OFFSET $5
+		) SELECT t.* FROM tmp t 
+		LEFT JOIN candle_one_minute com 
+		ON com.ticker = $1
+		AND t."start" = com."start"
+		WHERE com."start" IS NULL
+	`
+	rows, _ := repo.Pool.Query(repo.Context, query, ticker, start, end, limit, offset)
+	candles, err := pgx.CollectRows(rows, pgx.RowToStructByNameLax[util.Candle])
+	if err != nil {
+		log.Panicf("Error: Repository-Candle-GetCandles: %v", err)
+	}
+	return candles, nil
+}
+
 func (repo CandleConn) CopyCandles(table_name string, ticker string, candles util.CandleSlice) error {
 	_, err := repo.Conn.CopyFrom(
 		repo.Context,
