@@ -2,7 +2,6 @@ package repository
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/mmjlee/btc-analysis/internal/util"
@@ -20,7 +19,7 @@ func (repo CandlePool) GetCandles(ticker, start, end, limit, offset string) (uti
 	rows, _ := repo.Pool.Query(repo.Context, query, ticker, start, end, limit, offset)
 	candles, err := pgx.CollectRows(rows, pgx.RowToStructByName[util.Candle])
 	if err != nil {
-		log.Panicf("Error: Repository-Candle-GetCandles: %v", err)
+		return candles, util.WrappedError{Err: err, Message: "Repository-GetCandles-CollectRows"}
 	}
 	return candles, nil
 }
@@ -39,7 +38,7 @@ func (repo CandlePool) GetMissingCandles(ticker, start, end, limit, offset strin
 	rows, _ := repo.Pool.Query(repo.Context, query, ticker, start, end, limit, offset)
 	candles, err := pgx.CollectRows(rows, pgx.RowToStructByNameLax[util.Candle])
 	if err != nil {
-		log.Panicf("Error: Repository-Candle-GetCandles: %v", err)
+		return candles, util.WrappedError{Err: err, Message: "Repository-GetMissingCandles-CollectRows"}
 	}
 	return candles, nil
 }
@@ -118,7 +117,7 @@ func (repo CandleConn) InsertCandles(ticker string, candles util.CandleSlice) er
 	}
 	err := repo.Conn.SendBatch(repo.Context, batch).Close()
 	if err != nil {
-		log.Fatal(err)
+		return util.WrappedError{Err: err, Message: "Repository-InsertCandles-SendBatch"}
 	}
 
 	return err

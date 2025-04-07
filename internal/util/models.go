@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	"github.com/shopspring/decimal"
@@ -49,10 +50,15 @@ type Candle struct {
 
 type CandleSlice []Candle
 
-type CandleSliceWithTicker struct {
-	Ticker string `json:"ticker"`
-	CandleSlice
-}
 type CandleResponse struct {
 	Candles CandleSlice `json:"candles"`
+}
+
+type WrappedError struct {
+	Err     error
+	Message string
+}
+
+func (w WrappedError) Error() string {
+	return fmt.Sprintf("%s: %s", w.Err.Error(), w.Message)
 }

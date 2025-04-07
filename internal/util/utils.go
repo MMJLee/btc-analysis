@@ -5,6 +5,11 @@ import (
 )
 
 // custom implementation for the pgx CopyFrom
+type CandleSliceWithTicker struct {
+	Ticker string `json:"ticker"`
+	CandleSlice
+}
+
 func (c *CandleSliceWithTicker) Data() any {
 	return *c
 }
