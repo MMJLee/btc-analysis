@@ -1,7 +1,7 @@
 package api
 
 import (
-	"fmt"
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -34,5 +34,9 @@ func (c CandleHandler) GetCandles(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Panicf("Error: API-GetProduct-GetCandles: %v", err)
 	}
-	w.Write([]byte(fmt.Sprintf("%+v", candles)))
+	json_data, err := json.Marshal(candles)
+	if err != nil {
+		log.Panicf("Error: API-GetProduct-Marshal: %v", err)
+	}
+	w.Write(json_data)
 }
