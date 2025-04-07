@@ -62,7 +62,7 @@ func (c CandleHandler) GetMissingCandles(w http.ResponseWriter, r *http.Request)
 
 	candles, err := c.CandlePool.GetMissingCandles(ticker, start, end, limit, offset)
 	if err != nil {
-		log.Panicf("Error: API-GetMissingCandles-GetCandles: %v", err)
+		log.Panicf("Error: API-GetMissingCandles-GetMissingCandles: %v", err)
 	}
 	json_data, err := json.Marshal(candles)
 	if err != nil {
