@@ -12,6 +12,7 @@ import (
 	"github.com/mmjlee/btc-analysis/internal/client"
 	"github.com/mmjlee/btc-analysis/internal/repository"
 	"github.com/mmjlee/btc-analysis/internal/util"
+	"github.com/shopspring/decimal"
 )
 
 func getServer(c api.CandleHandler) http.Server {
@@ -34,7 +35,8 @@ func getServer(c api.CandleHandler) http.Server {
 	)
 
 	return http.Server{
-		Addr:    "localhost:8080",
+		Addr: "localhost:8080",
+		// Addr:    "0.0.0.0:8080",
 		Handler: middlewares(v1),
 	}
 }
@@ -43,6 +45,7 @@ func main() {
 	ctx := context.Background()
 	var wg sync.WaitGroup
 
+	decimal.MarshalJSONWithoutQuotes = true
 	// goroutine to log data from coinbase api to postgres db
 	conn := repository.NewCandleConn(ctx)
 	defer conn.Conn.Close(ctx)

@@ -5,8 +5,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-
-	"github.com/mmjlee/btc-analysis/api"
 )
 
 type APIClient struct {
@@ -23,7 +21,7 @@ func (a APIClient) NewRequest(method string, url url.URL, body io.Reader) (*http
 		log.Panicf("Error: Client-NewRequest-NewRequest: %v", err)
 	}
 
-	jwt, err := api.BuildJWT(method, url.Host, url.Path)
+	jwt, err := BuildJWT(method, url.Host, url.Path)
 	if err != nil {
 		log.Panicf("Error: Client-NewRequest-BuildJWT: %v", err)
 	}
