@@ -67,8 +67,8 @@ func (repo CandleConn) DropTable(table_name string) error {
 
 func (repo CandleConn) InsertFromStaging(table_name string) error {
 	query := fmt.Sprintf(` 
-		INSERT INTO candle_one_minute (ticker, "start", "open", high, low, "close", volume, created_on) 
-		SELECT ticker, "start", "open", high, low, "close", volume, current_timestamp
+		INSERT INTO candle_one_minute (ticker, "start", "open", high, low, "close", volume) 
+		SELECT ticker, "start", "open", high, low, "close", volume
 		FROM %s
 		ON CONFLICT ON CONSTRAINT candle_one_minute_pk DO UPDATE SET
 			high = EXCLUDED.high,

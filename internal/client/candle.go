@@ -42,22 +42,22 @@ func (a *APIClient) GetCandles(product_id, start, end, limit string) (util.Candl
 	return candles_response, nil
 }
 
-func (a *APIClient) LogCandles(conn repository.CandleConn, product_id string) error {
+func (a *APIClient) LogCandles(conn repository.CandleConn, product_id string) {
 	limit, count := 3, 0
 	for {
-		now := time.Now().Add(time.Duration(-limit) * time.Minute).Truncate(time.Minute)
+		now := time.Now().Truncate(time.Minute)
 		start := now.Add(time.Duration(-limit) * time.Minute).Unix()
 		end := now.Add(time.Duration(-1) * time.Second).Unix()
 		count++
 
 		candles_response, err := a.GetCandles(product_id, strconv.FormatInt(start, 10), strconv.FormatInt(end, 10), strconv.Itoa(limit))
 		if err != nil {
-			return util.WrappedError{Err: err, Message: "Client-LogCandles-GetCandles"}
+			log.Panic(util.WrappedError{Err: err, Message: "Client-LogCandles-GetCandles"}.Error())
 		}
 		if err := conn.InsertCandles(product_id, candles_response.Candles); err != nil {
-			return util.WrappedError{Err: err, Message: "Client-LogCandles-InsertCandles"}
+			log.Panic(util.WrappedError{Err: err, Message: "Client-LogCandles-InsertCandles"}.Error())
 		}
-		if count > 60 {
+		if count > 5 {
 			count = 0
 			log.Println("Logging:", product_id, start)
 		}
@@ -65,21 +65,23 @@ func (a *APIClient) LogCandles(conn repository.CandleConn, product_id string) er
 	}
 }
 
-func (a *APIClient) BackfillCandles(conn repository.CandleConn, product_id string) error {
+func (a *APIClient) BackfillCandles(conn repository.CandleConn, product_id string, start, stop int64) {
 	limit, count := 350, 0
+	now := time.Unix(start, 0)
 	for {
-		now := time.Now().Add(time.Duration(-limit*count) * time.Minute).Truncate(time.Minute)
-		start := now.Add(time.Duration(-limit) * time.Minute).Unix()
-		end := now.Add(time.Duration(-1) * time.Second).Unix()
+		start := now.Add(time.Duration(count*limit) * time.Minute).Unix()
+		end := now.Add(time.Duration((count+1)*limit)*time.Minute - time.Second).Unix()
 		count++
-
 		candles_response, err := a.GetCandles(product_id, strconv.FormatInt(start, 10), strconv.FormatInt(end, 10), strconv.Itoa(limit))
 		if err != nil {
-			return util.WrappedError{Err: err, Message: "Client-BackfillCandles-GetCandles"}
+			log.Panic(util.WrappedError{Err: err, Message: "Client-BackfillCandles-GetCandles"}.Error())
 		}
 		if err := conn.BulkLogCandles(product_id, candles_response.Candles); err != nil {
-			return util.WrappedError{Err: err, Message: "Client-BackfillCandles-BulkLogCandles"}
+			log.Panic(util.WrappedError{Err: err, Message: "Client-BackfillCandles-BulkLogCandles"}.Error())
 		}
-		time.Sleep(time.Duration(250) * time.Millisecond)
+		time.Sleep(time.Duration(150) * time.Millisecond)
+		if start > stop {
+			return
+		}
 	}
 }

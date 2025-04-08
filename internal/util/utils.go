@@ -4,6 +4,8 @@ import (
 	"fmt"
 )
 
+const ISODate = "2006-01-02"
+
 // custom implementation for the pgx CopyFrom
 type CandleSliceWithTicker struct {
 	Ticker string `json:"ticker"`

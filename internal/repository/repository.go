@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"log"
 	"os"
 
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
@@ -15,11 +16,11 @@ type CandlePool struct {
 	*pgxpool.Pool
 }
 
-func NewCandlePool(ctx context.Context) (CandlePool, error) {
+func NewCandlePool(ctx context.Context) CandlePool {
 	conn_string := os.Getenv("DATABASE_CONNECTION_STRING")
 	dbConfig, err := pgxpool.ParseConfig(conn_string)
 	if err != nil {
-		return CandlePool{}, util.WrappedError{Err: err, Message: "Repository-NewCandlePool-ParseConfig"}
+		log.Panic(util.WrappedError{Err: err, Message: "Repository-NewCandlePool-ParseConfig"}.Error())
 	}
 	dbConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
 		pgxdecimal.Register(conn.TypeMap())
@@ -27,9 +28,9 @@ func NewCandlePool(ctx context.Context) (CandlePool, error) {
 	}
 	pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 	if err != nil {
-		return CandlePool{}, util.WrappedError{Err: err, Message: "Repository-NewCandlePool-NewWithConfig"}
+		log.Panic(util.WrappedError{Err: err, Message: "Repository-NewCandlePool-NewWithConfig"}.Error())
 	}
-	return CandlePool{Context: ctx, Pool: pool}, nil
+	return CandlePool{Context: ctx, Pool: pool}
 }
 
 type CandleConn struct {
@@ -37,12 +38,12 @@ type CandleConn struct {
 	*pgx.Conn
 }
 
-func NewCandleConn(ctx context.Context) (CandleConn, error) {
+func NewCandleConn(ctx context.Context) CandleConn {
 	conn_string := os.Getenv("DATABASE_CONNECTION_STRING")
 	conn, err := pgx.Connect(ctx, conn_string)
 	if err != nil {
-		return CandleConn{}, util.WrappedError{Err: err, Message: "Repository-NewCandleConn-Connect"}
+		log.Panic(util.WrappedError{Err: err, Message: "Repository-NewCandleConn-Connect"}.Error())
 	}
 	pgxdecimal.Register(conn.TypeMap())
-	return CandleConn{Context: ctx, Conn: conn}, nil
+	return CandleConn{Context: ctx, Conn: conn}
 }
