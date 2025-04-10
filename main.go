@@ -5,16 +5,14 @@ import (
 
 	"github.com/mmjlee/btc-analysis/api"
 	"github.com/mmjlee/btc-analysis/internal/client"
-	"github.com/mmjlee/btc-analysis/internal/repository"
+	"github.com/mmjlee/btc-analysis/internal/database"
 	"github.com/shopspring/decimal"
 )
 
 func main() {
 	var wg sync.WaitGroup
-	var mut *sync.Mutex
-	// ctxt, cnclFn := context.WithCancel()
 	decimal.MarshalJSONWithoutQuotes = true
-
+	trackMut := new(sync.Mutex)
 	// goroutine to log data from coinbase api to postgres db
 	// TrackTicker can also be called from the api
 	tickerMap := make(map[string]chan bool)
@@ -28,10 +26,10 @@ func main() {
 	}()
 
 	// serve http requests
-	dbPool := repository.NewPool()
-	defer dbPool.Pool.Close()
+	dbPool := database.NewPool()
+	defer dbPool.Close()
 	candleHandler := api.NewCandleHandler(dbPool)
-	trackHandler := api.NewTrackHandler(dbPool, tickerMap, mut)
+	trackHandler := api.NewTrackHandler(dbPool, tickerMap, trackMut)
 	server := api.GetServer(candleHandler, trackHandler)
 	server.ListenAndServe()
 

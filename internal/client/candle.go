@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mmjlee/btc-analysis/internal/repository"
+	"github.com/mmjlee/btc-analysis/internal/database"
 	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
@@ -37,7 +37,7 @@ func (c CoinbaseClient) GetCandles(ticker, start, end, limit string) (util.Candl
 	return candlesResponse, nil
 }
 
-func LogRecentCandles(ctx context.Context, client CoinbaseClient, conn repository.DBConn, ticker string, limit int) error {
+func LogRecentCandles(ctx context.Context, client CoinbaseClient, conn database.DBConn, ticker string, limit int) error {
 	now := time.Now()
 	start := now.Add(time.Duration(-limit)*time.Minute + time.Second).Unix()
 	candlesResponse, err := client.GetCandles(ticker, strconv.FormatInt(start, 10), strconv.FormatInt(now.Unix(), 10), strconv.Itoa(limit))
@@ -52,7 +52,7 @@ func LogRecentCandles(ctx context.Context, client CoinbaseClient, conn repositor
 
 func TrackTicker(ticker string, stopChan chan bool) error {
 	ctx := context.Background()
-	conn := repository.NewConn()
+	conn := database.NewConn()
 	defer conn.Close(ctx)
 	client := NewCoinbaseClient()
 	limit := 3
@@ -71,7 +71,7 @@ func TrackTicker(ticker string, stopChan chan bool) error {
 	}
 }
 
-func BackfillCandles(ctx context.Context, client CoinbaseClient, conn repository.DBConn, ticker string, start, stop, limit int64) error {
+func BackfillCandles(ctx context.Context, client CoinbaseClient, conn database.DBConn, ticker string, start, stop, limit int64) error {
 	candlesResponse, err := client.GetCandles(ticker, strconv.FormatInt(start, 10), strconv.FormatInt(stop, 10), strconv.FormatInt(limit, 10))
 	if err != nil {
 		return util.WrappedError{Err: err, Message: "Client-BackfillCandles-GetCandles"}
@@ -84,7 +84,7 @@ func BackfillCandles(ctx context.Context, client CoinbaseClient, conn repository
 
 func BackfillTicker(ticker string, start, stop int64, stopChan chan bool) error {
 	ctx := context.Background()
-	conn := repository.NewConn()
+	conn := database.NewConn()
 	defer conn.Close(ctx)
 	client := NewCoinbaseClient()
 	limit := int64(350)

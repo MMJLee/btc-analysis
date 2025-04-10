@@ -8,19 +8,19 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mmjlee/btc-analysis/internal/repository"
+	"github.com/mmjlee/btc-analysis/internal/database"
 	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
 type CandleHandler struct {
-	repository.DBPool
+	pool database.DBPool
 }
 
-func NewCandleHandler(repo repository.DBPool) CandleHandler {
-	return CandleHandler{repo}
+func NewCandleHandler(pool database.DBPool) *CandleHandler {
+	return &CandleHandler{pool: pool}
 }
 
-func (c CandleHandler) Get(w http.ResponseWriter, r *http.Request) {
+func (c *CandleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")
 	queryParams := r.URL.Query()
 	start := queryParams.Get("start")
@@ -39,7 +39,7 @@ func (c CandleHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 		start = strconv.FormatInt(time.Unix(startInt, 0).Truncate(time.Minute).Unix(), 10)
 	}
-	candles, err := c.DBPool.GetCandles(r.Context(), ticker, start, end, limit, offset, missing)
+	candles, err := c.pool.GetCandles(r.Context(), ticker, start, end, limit, offset, missing)
 	if err != nil {
 		log.Panicf("Error: API-GetCandles-GetCandles: %v", err)
 	}
@@ -50,31 +50,31 @@ func (c CandleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
-func (c CandleHandler) Post(w http.ResponseWriter, r *http.Request) {
+func (c *CandleHandler) Post(w http.ResponseWriter, r *http.Request) {
 	util.WriteError(w, http.StatusNotImplemented)
 	return
 }
 
-func (c CandleHandler) Put(w http.ResponseWriter, r *http.Request) {
+func (c *CandleHandler) Put(w http.ResponseWriter, r *http.Request) {
 	util.WriteError(w, http.StatusNotImplemented)
 	return
 }
 
-func (c CandleHandler) Patch(w http.ResponseWriter, r *http.Request) {
+func (c *CandleHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	util.WriteError(w, http.StatusNotImplemented)
 	return
 }
 
-func (c CandleHandler) Delete(w http.ResponseWriter, r *http.Request) {
+func (c *CandleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	util.WriteError(w, http.StatusNotImplemented)
 	return
 }
 
-func (c CandleHandler) Options(w http.ResponseWriter, r *http.Request) {
+func (c *CandleHandler) Options(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (c CandleHandler) Handle(r *http.ServeMux) {
+func (c *CandleHandler) Handle(r *http.ServeMux) {
 	r.HandleFunc("GET /candle/{ticker}", c.Get)
 	r.HandleFunc("POST /candle/{ticker}", c.Post)
 	r.HandleFunc("PUT /candle/{ticker}", c.Put)

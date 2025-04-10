@@ -1,4 +1,4 @@
-package repository
+package database
 
 import (
 	"context"
@@ -32,7 +32,7 @@ func (repo DBPool) GetCandles(c context.Context, ticker, start, end, limit, offs
 	rows, _ := repo.Pool.Query(c, query, ticker, start, end, limit, offset)
 	candles, err := pgx.CollectRows(rows, pgx.RowToStructByNameLax[util.Candle])
 	if err != nil {
-		return candles, util.WrappedError{Err: err, Message: "Repository-GetCandles-CollectRows"}
+		return candles, util.WrappedError{Err: err, Message: "Database-GetCandles-CollectRows"}
 	}
 	return candles, nil
 }
@@ -44,19 +44,19 @@ func (repo DBConn) CopyCandles(c context.Context, tableName string, ticker strin
 		[]string{"ticker", "start", "open", "high", "low", "close", "volume"},
 		&util.CandleSliceWithTicker{Ticker: ticker, CandleSlice: candles},
 	)
-	return util.WrappedError{Err: err, Message: "Repository-CopyCandles-CopyFrom"}
+	return util.WrappedError{Err: err, Message: "Database-CopyCandles-CopyFrom"}
 }
 
 func (repo DBConn) CreateTable(c context.Context, tableName string) error {
 	query := fmt.Sprintf(`CREATE TABLE %s (LIKE candle_one_minute INCLUDING DEFAULTS);`, tableName)
 	_, err := repo.Conn.Exec(c, query)
-	return util.WrappedError{Err: err, Message: "Repository-CreateTable-Exec"}
+	return util.WrappedError{Err: err, Message: "Database-CreateTable-Exec"}
 }
 
 func (repo DBConn) DropTable(c context.Context, tableName string) error {
 	query := fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tableName)
 	_, err := repo.Conn.Exec(c, query)
-	return util.WrappedError{Err: err, Message: "Repository-DropTable-Exec"}
+	return util.WrappedError{Err: err, Message: "Database-DropTable-Exec"}
 }
 
 func (repo DBConn) InsertFromStaging(c context.Context, tableName string) error {
@@ -71,25 +71,25 @@ func (repo DBConn) InsertFromStaging(c context.Context, tableName string) error 
 			volume = EXCLUDED.volume;
 	`, tableName)
 	_, err := repo.Conn.Exec(c, query)
-	return util.WrappedError{Err: err, Message: "Repository-InsertFromStaging-Exec"}
+	return util.WrappedError{Err: err, Message: "Database-InsertFromStaging-Exec"}
 }
 
 func (repo DBConn) BulkLogCandles(c context.Context, ticker string, candles util.CandleSlice) error {
 	tableName := "staging_candle_one_minute"
 	if err := repo.DropTable(c, tableName); err != nil {
-		return util.WrappedError{Err: err, Message: "Repository-BulkLogCandles-DropTable"}
+		return util.WrappedError{Err: err, Message: "Database-BulkLogCandles-DropTable"}
 	}
 	if err := repo.CreateTable(c, tableName); err != nil {
-		return util.WrappedError{Err: err, Message: "Repository-BulkLogCandles-CreateTable"}
+		return util.WrappedError{Err: err, Message: "Database-BulkLogCandles-CreateTable"}
 	}
 	if err := repo.CopyCandles(c, tableName, ticker, candles); err != nil {
-		return util.WrappedError{Err: err, Message: "Repository-BulkLogCandles-CopyCandles"}
+		return util.WrappedError{Err: err, Message: "Database-BulkLogCandles-CopyCandles"}
 	}
 	if err := repo.InsertFromStaging(c, tableName); err != nil {
-		return util.WrappedError{Err: err, Message: "Repository-BulkLogCandles-InsertFromStaging"}
+		return util.WrappedError{Err: err, Message: "Database-BulkLogCandles-InsertFromStaging"}
 	}
 	if err := repo.DropTable(c, tableName); err != nil {
-		return util.WrappedError{Err: err, Message: "Repository-InsertFromStaging-DropTable"}
+		return util.WrappedError{Err: err, Message: "Database-InsertFromStaging-DropTable"}
 	}
 	return nil
 }
@@ -111,7 +111,7 @@ func (repo DBConn) InsertCandles(c context.Context, ticker string, candles util.
 	}
 	err := repo.Conn.SendBatch(c, batch).Close()
 	if err != nil {
-		return util.WrappedError{Err: err, Message: "Repository-InsertCandles-SendBatch"}
+		return util.WrappedError{Err: err, Message: "Database-InsertCandles-SendBatch"}
 	}
 	return nil
 }

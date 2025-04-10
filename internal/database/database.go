@@ -1,4 +1,4 @@
-package repository
+package database
 
 import (
 	"context"
@@ -18,7 +18,7 @@ type DBPool struct {
 func NewPool() DBPool {
 	dbConfig, err := pgxpool.ParseConfig(os.Getenv("DATABASE_CONNECTION_STRING"))
 	if err != nil {
-		log.Panic(util.WrappedError{Err: err, Message: "Repository-NewCandlePool-ParseConfig"}.Error())
+		log.Panic(util.WrappedError{Err: err, Message: "Database-NewCandlePool-ParseConfig"}.Error())
 	}
 	dbConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
 		pgxdecimal.Register(conn.TypeMap())
@@ -26,7 +26,7 @@ func NewPool() DBPool {
 	}
 	pool, err := pgxpool.NewWithConfig(context.Background(), dbConfig)
 	if err != nil {
-		log.Panic(util.WrappedError{Err: err, Message: "Repository-NewCandlePool-NewWithConfig"}.Error())
+		log.Panic(util.WrappedError{Err: err, Message: "Database-NewCandlePool-NewWithConfig"}.Error())
 	}
 	return DBPool{pool}
 }
@@ -38,7 +38,7 @@ type DBConn struct {
 func NewConn() DBConn {
 	conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_CONNECTION_STRING"))
 	if err != nil {
-		log.Panic(util.WrappedError{Err: err, Message: "Repository-NewCandleConn-Connect"}.Error())
+		log.Panic(util.WrappedError{Err: err, Message: "Database-NewCandleConn-Connect"}.Error())
 	}
 	pgxdecimal.Register(conn.TypeMap())
 	return DBConn{conn}
