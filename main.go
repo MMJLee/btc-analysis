@@ -12,16 +12,15 @@ import (
 func main() {
 	var wg sync.WaitGroup
 	decimal.MarshalJSONWithoutQuotes = true
-	trackMut := new(sync.Mutex)
-	// goroutine to log data from coinbase api to postgres db
-	// TrackTicker can also be called from the api
-	tickerMap := make(map[string]chan bool)
+
 	ticker := "BTC-USD"
+	tickerMap := make(map[string]chan bool)
 	stopChan := make(chan bool)
 	tickerMap[ticker] = stopChan
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		// TrackTicker can also be started with the api as a goroutine /track/{ticker}
 		client.TrackTicker(ticker, stopChan)
 	}()
 
@@ -29,6 +28,7 @@ func main() {
 	dbPool := database.NewPool()
 	defer dbPool.Close()
 	candleHandler := api.NewCandleHandler(dbPool)
+	trackMut := new(sync.Mutex)
 	trackHandler := api.NewTrackHandler(dbPool, tickerMap, trackMut)
 	server := api.GetServer(candleHandler, trackHandler)
 	server.ListenAndServe()
