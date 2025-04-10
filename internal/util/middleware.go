@@ -23,13 +23,32 @@ func CreateStack(middlewares ...Middleware) Middleware {
 	}
 }
 
+func GetBaseMiddlewares() Middleware {
+	return CreateStack(
+		GzipMiddleware,
+		CORSMiddleware,
+		ErrorMiddleware,
+		LoggingMiddleware,
+	)
+}
+
+func ApplyMiddlewares(handler *http.ServeMux) http.Handler {
+	middlewares := CreateStack(
+		GzipMiddleware,
+		CORSMiddleware,
+		ErrorMiddleware,
+		LoggingMiddleware,
+	)
+	return middlewares(handler)
+}
+
 type wrappedWriter struct {
 	http.ResponseWriter
 	statusCode int
 }
 
 func (w *wrappedWriter) WriteHeader(statusCode int) {
-	w.ResponseWriter.WriteHeader((statusCode))
+	w.ResponseWriter.WriteHeader(statusCode)
 	w.statusCode = statusCode
 }
 
@@ -37,8 +56,7 @@ func ErrorMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(http.StatusText(http.StatusInternalServerError)))
+				WriteError(w, http.StatusNotImplemented)
 				return
 			}
 		}()
@@ -102,8 +120,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		authorization := r.Header.Get("Authorization")
 		token, err := base64.StdEncoding.DecodeString(authorization)
 		if err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(http.StatusText(http.StatusUnauthorized)))
+			WriteError(w, http.StatusUnauthorized)
 			return
 		}
 		userID := string(token)

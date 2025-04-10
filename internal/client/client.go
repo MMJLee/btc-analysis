@@ -4,19 +4,20 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
-type APIClient struct {
+type CoinbaseClient struct {
 	*http.Client
 }
 
-func GetNewAPIClient() APIClient {
-	return APIClient{&http.Client{}}
+func NewCoinbaseClient() CoinbaseClient {
+	return CoinbaseClient{&http.Client{Timeout: time.Duration(5) * time.Second}}
 }
 
-func (a APIClient) NewRequest(method string, url url.URL, body io.Reader) (*http.Request, error) {
+func NewRequest(method string, url url.URL, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest(method, url.String(), body)
 	if err != nil {
 		return req, util.WrappedError{Err: err, Message: "Client-NewRequest-NewRequest"}

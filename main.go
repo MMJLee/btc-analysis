@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"sync"
 
 	"github.com/mmjlee/btc-analysis/api"
@@ -11,26 +10,29 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
 	var wg sync.WaitGroup
-
+	var mut *sync.Mutex
+	// ctxt, cnclFn := context.WithCancel()
 	decimal.MarshalJSONWithoutQuotes = true
+
 	// goroutine to log data from coinbase api to postgres db
-	conn := repository.NewCandleConn(ctx)
-	defer conn.Conn.Close(ctx)
-	candle_logger := client.GetNewAPIClient()
+	// TrackTicker can also be called from the api
+	tickerMap := make(map[string]chan bool)
+	ticker := "BTC-USD"
+	stopChan := make(chan bool)
+	tickerMap[ticker] = stopChan
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		// candle_logger.BackfillCandles(conn, "BTC-USD", 1743744173, 1744072052)
-		candle_logger.LogCandles(conn, "BTC-USD")
+		client.TrackTicker(ticker, stopChan)
 	}()
 
 	// serve http requests
-	candle_pool := repository.NewCandlePool(ctx)
-	defer candle_pool.Pool.Close()
-	candle_handler := api.NewCandleHandler(candle_pool)
-	server := api.GetServer(candle_handler)
+	dbPool := repository.NewPool()
+	defer dbPool.Pool.Close()
+	candleHandler := api.NewCandleHandler(dbPool)
+	trackHandler := api.NewTrackHandler(dbPool, tickerMap, mut)
+	server := api.GetServer(candleHandler, trackHandler)
 	server.ListenAndServe()
 
 	wg.Wait()

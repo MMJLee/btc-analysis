@@ -6,28 +6,29 @@ import (
 	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
-func GetServer(c CandleHandler) http.Server {
-	router := http.NewServeMux()
-	router.HandleFunc("GET /candle/{ticker}", c.GetCandles)
-	router.HandleFunc("OPTIONS /candle/{ticker}", c.Options)
-	router.HandleFunc("GET /candle/missing/{ticker}", c.GetMissingCandles)
-	router.HandleFunc("OPTIONS /candle/missing/{ticker}", c.Options)
+type Handler interface {
+	Handle(r *http.ServeMux)
+	Get(w http.ResponseWriter, r *http.Request)
+	Post(w http.ResponseWriter, r *http.Request)
+	Put(w http.ResponseWriter, r *http.Request)
+	Patch(w http.ResponseWriter, r *http.Request)
+	Delete(w http.ResponseWriter, r *http.Request)
+	Options(w http.ResponseWriter, r *http.Request)
+}
+
+func GetServer(handlers ...Handler) http.Server {
+	baseHandler := http.NewServeMux()
+	for _, h := range handlers {
+		h.Handle(baseHandler)
+	}
+	handler := util.ApplyMiddlewares(baseHandler)
 	// admin_router := http.NewServeMux()
 	// admin_router.HandleFunc("PUT /candle/{ticker}", c.GetCandles)
-	// admin_router.HandleFunc("PATCH /candle/{ticker}", c.GetCandles)
-	// admin_router.HandleFunc("DELETE /candle/{ticker}", c.GetCandles)
 	// router.Handle("/", util.AuthMiddleware(admin_router))
 	v1 := http.NewServeMux()
-	v1.Handle("/v1/", http.StripPrefix("/v1", router))
-	middlewares := util.CreateStack(
-		util.GzipMiddleware,
-		util.CORSMiddleware,
-		util.ErrorMiddleware,
-		util.LoggingMiddleware,
-	)
-
+	v1.Handle("/v1/", http.StripPrefix("/v1", handler))
 	return http.Server{
 		Addr:    "0.0.0.0:8080",
-		Handler: middlewares(v1),
+		Handler: v1,
 	}
 }

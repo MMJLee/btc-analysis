@@ -5,7 +5,7 @@ import (
 	"net/url"
 )
 
-func GetProductCandleUrl(product_id, start, end, granularity, limit string) url.URL {
+func GetProductCandleUrl(ticker, start, end, granularity, limit string) url.URL {
 	params := url.Values{}
 	params.Add("start", start)
 	params.Add("end", end)
@@ -13,7 +13,7 @@ func GetProductCandleUrl(product_id, start, end, granularity, limit string) url.
 	params.Add("limit", limit)
 
 	requestHost := "api.coinbase.com"
-	requestPath := fmt.Sprintf("/api/v3/brokerage/products/%s/candles", product_id)
+	requestPath := fmt.Sprintf("/api/v3/brokerage/products/%s/candles", ticker)
 
 	return url.URL{
 		Scheme:   "https",

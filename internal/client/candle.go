@@ -1,8 +1,8 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"log"
 	"strconv"
@@ -12,76 +12,93 @@ import (
 	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
-func (a *APIClient) GetCandles(product_id, start, end, limit string) (util.CandleResponse, error) {
-	var candles_response util.CandleResponse
-	candle_url := util.GetProductCandleUrl(product_id, start, end, "ONE_MINUTE", limit)
-	req, err := a.NewRequest("GET", candle_url, nil)
+func (c CoinbaseClient) GetCandles(productId, start, end, limit string) (util.CandleResponse, error) {
+	var candlesResponse util.CandleResponse
+	candleUrl := util.GetProductCandleUrl(productId, start, end, "ONE_MINUTE", limit)
+	req, err := NewRequest("GET", candleUrl, nil)
 	if err != nil {
-		return candles_response, util.WrappedError{Err: err, Message: "Client-GetCandles-NewRequest"}
+		return candlesResponse, util.WrappedError{Err: err, Message: "Client-GetCandles-NewRequest"}
 	}
-
-	resp, err := a.Client.Do(req)
+	resp, err := c.Do(req)
 	if err != nil {
-		return candles_response, util.WrappedError{Err: err, Message: "Client-GetCandles-Do"}
+		return candlesResponse, util.WrappedError{Err: err, Message: "Client-GetCandles-Do"}
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return candles_response, util.WrappedError{Err: err, Message: "Client-GetCandles-ReadAll"}
+		return candlesResponse, util.WrappedError{Err: err, Message: "Client-GetCandles-ReadAll"}
 	}
 
-	if resp.StatusCode != 200 {
-		return candles_response, util.WrappedError{Err: errors.New("something went wrong"), Message: "Client-GetCandles-Response"}
-	}
-
-	err = json.Unmarshal([]byte(body), &candles_response)
+	err = json.Unmarshal([]byte(body), &candlesResponse)
 	if err != nil {
-		return candles_response, util.WrappedError{Err: err, Message: "Client-GetCandles-Unmarshal"}
+		return candlesResponse, util.WrappedError{Err: err, Message: "Client-GetCandles-Unmarshal"}
 	}
-	return candles_response, nil
+	return candlesResponse, nil
 }
 
-func (a *APIClient) LogCandles(conn repository.CandleConn, product_id string) {
-	limit, count := 3, 0
-	for {
-		now := time.Now().Truncate(time.Minute)
-		start := now.Add(time.Duration(-limit) * time.Minute).Unix()
-		end := now.Add(time.Duration(-1) * time.Second).Unix()
-		count++
+func LogRecentCandles(ctx context.Context, client CoinbaseClient, conn repository.DBConn, productId string, limit int) error {
+	now := time.Now()
+	start := now.Add(time.Duration(-limit)*time.Minute + time.Second).Unix()
+	candlesResponse, err := client.GetCandles(productId, strconv.FormatInt(start, 10), strconv.FormatInt(now.Unix(), 10), strconv.Itoa(limit))
+	if err != nil {
+		return util.WrappedError{Err: err, Message: "Client-LogCandles-GetCandles"}
+	}
+	if err := conn.InsertCandles(ctx, productId, candlesResponse.Candles); err != nil {
+		return util.WrappedError{Err: err, Message: "Client-LogCandles-InsertCandles"}
+	}
+	return nil
+}
 
-		candles_response, err := a.GetCandles(product_id, strconv.FormatInt(start, 10), strconv.FormatInt(end, 10), strconv.Itoa(limit))
-		if err != nil {
-			log.Panic(util.WrappedError{Err: err, Message: "Client-LogCandles-GetCandles"}.Error())
+func TrackTicker(ticker string, stopChan chan bool) error {
+	ctx := context.Background()
+	conn := repository.NewConn()
+	defer conn.Close(ctx)
+	client := NewCoinbaseClient()
+	limit := 3
+
+	for {
+		select {
+		case <-stopChan:
+			log.Println("Stopped tracking", ticker)
+			return nil
+		default:
+			if err := LogRecentCandles(ctx, client, conn, ticker, limit); err != nil {
+				return util.WrappedError{Err: err, Message: "Client-TrackTicker"}
+			}
+			time.Sleep(time.Duration(10) * time.Second)
 		}
-		if err := conn.InsertCandles(product_id, candles_response.Candles); err != nil {
-			log.Panic(util.WrappedError{Err: err, Message: "Client-LogCandles-InsertCandles"}.Error())
-		}
-		if count > 5 {
-			count = 0
-			log.Println("Logging:", product_id, start)
-		}
-		time.Sleep(time.Duration(10) * time.Second)
 	}
 }
 
-func (a *APIClient) BackfillCandles(conn repository.CandleConn, product_id string, start, stop int64) {
-	limit, count := 350, 0
-	now := time.Unix(start, 0)
-	for {
-		start := now.Add(time.Duration(count*limit) * time.Minute).Unix()
-		end := now.Add(time.Duration((count+1)*limit)*time.Minute - time.Second).Unix()
-		count++
-		candles_response, err := a.GetCandles(product_id, strconv.FormatInt(start, 10), strconv.FormatInt(end, 10), strconv.Itoa(limit))
-		if err != nil {
-			log.Panic(util.WrappedError{Err: err, Message: "Client-BackfillCandles-GetCandles"}.Error())
-		}
-		if err := conn.BulkLogCandles(product_id, candles_response.Candles); err != nil {
-			log.Panic(util.WrappedError{Err: err, Message: "Client-BackfillCandles-BulkLogCandles"}.Error())
-		}
-		time.Sleep(time.Duration(150) * time.Millisecond)
-		if start > stop {
-			return
+func BackfillCandles(ctx context.Context, client CoinbaseClient, conn repository.DBConn, productId string, start, stop, limit int64) error {
+	candlesResponse, err := client.GetCandles(productId, strconv.FormatInt(start, 10), strconv.FormatInt(stop, 10), strconv.FormatInt(limit, 10))
+	if err != nil {
+		return util.WrappedError{Err: err, Message: "Client-BackfillCandles-GetCandles"}
+	}
+	if err := conn.BulkLogCandles(ctx, productId, candlesResponse.Candles); err != nil {
+		return util.WrappedError{Err: err, Message: "Client-BackfillCandles-BulkLogCandles"}
+	}
+	return nil
+}
+
+func BackfillTicker(ticker string, start, stop int64, stopChan chan bool) error {
+	ctx := context.Background()
+	conn := repository.NewConn()
+	defer conn.Close(ctx)
+	client := NewCoinbaseClient()
+	limit := int64(350)
+	for t := start; t < stop; t += limit * 60 {
+		select {
+		case <-stopChan:
+			log.Println("Stopped backfilling", ticker)
+			return nil
+		default:
+			if err := BackfillCandles(ctx, client, conn, ticker, t, (t + (limit * 60) - 1), limit); err != nil {
+				return util.WrappedError{Err: err, Message: "Client-BackfillTicker-BackfillCandles"}
+			}
+			time.Sleep(time.Duration(150) * time.Millisecond)
 		}
 	}
+	return nil
 }
