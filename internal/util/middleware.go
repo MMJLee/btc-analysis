@@ -56,7 +56,8 @@ func ErrorMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				WriteError(w, http.StatusNotImplemented)
+				log.Println(err)
+				WriteError(w, http.StatusInternalServerError)
 				return
 			}
 		}()

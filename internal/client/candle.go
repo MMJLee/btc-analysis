@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mmjlee/btc-analysis/internal/repository"
+	"github.com/mmjlee/btc-analysis/internal/database"
 	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
-func (c CoinbaseClient) GetCandles(productId, start, end, limit string) (util.CandleResponse, error) {
+func (c CoinbaseClient) GetCandles(ticker, start, end, limit string) (util.CandleResponse, error) {
 	var candlesResponse util.CandleResponse
-	candleUrl := util.GetProductCandleUrl(productId, start, end, "ONE_MINUTE", limit)
+	candleUrl := util.GetProductCandleUrl(ticker, start, end, "ONE_MINUTE", limit)
 	req, err := NewRequest("GET", candleUrl, nil)
 	if err != nil {
 		return candlesResponse, util.WrappedError{Err: err, Message: "Client-GetCandles-NewRequest"}
@@ -37,14 +37,14 @@ func (c CoinbaseClient) GetCandles(productId, start, end, limit string) (util.Ca
 	return candlesResponse, nil
 }
 
-func LogRecentCandles(ctx context.Context, client CoinbaseClient, conn repository.DBConn, productId string, limit int) error {
+func LogRecentCandles(ctx context.Context, client CoinbaseClient, conn database.DBConn, ticker string, limit int) error {
 	now := time.Now()
 	start := now.Add(time.Duration(-limit)*time.Minute + time.Second).Unix()
-	candlesResponse, err := client.GetCandles(productId, strconv.FormatInt(start, 10), strconv.FormatInt(now.Unix(), 10), strconv.Itoa(limit))
+	candlesResponse, err := client.GetCandles(ticker, strconv.FormatInt(start, 10), strconv.FormatInt(now.Unix(), 10), strconv.Itoa(limit))
 	if err != nil {
 		return util.WrappedError{Err: err, Message: "Client-LogCandles-GetCandles"}
 	}
-	if err := conn.InsertCandles(ctx, productId, candlesResponse.Candles); err != nil {
+	if err := conn.InsertCandles(ctx, ticker, candlesResponse.Candles); err != nil {
 		return util.WrappedError{Err: err, Message: "Client-LogCandles-InsertCandles"}
 	}
 	return nil
@@ -52,7 +52,7 @@ func LogRecentCandles(ctx context.Context, client CoinbaseClient, conn repositor
 
 func TrackTicker(ticker string, stopChan chan bool) error {
 	ctx := context.Background()
-	conn := repository.NewConn()
+	conn := database.NewConn()
 	defer conn.Close(ctx)
 	client := NewCoinbaseClient()
 	limit := 3
@@ -71,12 +71,12 @@ func TrackTicker(ticker string, stopChan chan bool) error {
 	}
 }
 
-func BackfillCandles(ctx context.Context, client CoinbaseClient, conn repository.DBConn, productId string, start, stop, limit int64) error {
-	candlesResponse, err := client.GetCandles(productId, strconv.FormatInt(start, 10), strconv.FormatInt(stop, 10), strconv.FormatInt(limit, 10))
+func BackfillCandles(ctx context.Context, client CoinbaseClient, conn database.DBConn, ticker string, start, stop, limit int64) error {
+	candlesResponse, err := client.GetCandles(ticker, strconv.FormatInt(start, 10), strconv.FormatInt(stop, 10), strconv.FormatInt(limit, 10))
 	if err != nil {
 		return util.WrappedError{Err: err, Message: "Client-BackfillCandles-GetCandles"}
 	}
-	if err := conn.BulkLogCandles(ctx, productId, candlesResponse.Candles); err != nil {
+	if err := conn.BulkLogCandles(ctx, ticker, candlesResponse.Candles); err != nil {
 		return util.WrappedError{Err: err, Message: "Client-BackfillCandles-BulkLogCandles"}
 	}
 	return nil
@@ -84,7 +84,7 @@ func BackfillCandles(ctx context.Context, client CoinbaseClient, conn repository
 
 func BackfillTicker(ticker string, start, stop int64, stopChan chan bool) error {
 	ctx := context.Background()
-	conn := repository.NewConn()
+	conn := database.NewConn()
 	defer conn.Close(ctx)
 	client := NewCoinbaseClient()
 	limit := int64(350)
