@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+
 	var wg sync.WaitGroup
 	decimal.MarshalJSONWithoutQuotes = true
 

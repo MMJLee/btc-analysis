@@ -29,9 +29,9 @@ func (t *TrackHandler) Get(w http.ResponseWriter, r *http.Request) {
 	_, exists := t.tickerMap[ticker]
 	t.mut.Unlock()
 
-	message := fmt.Sprintf("Now tracking %s", ticker)
+	message := fmt.Sprintf("Not tracking %s", ticker)
 	if exists {
-		message = fmt.Sprintf("Already tracking %s", ticker)
+		message = fmt.Sprintf("Currently tracking %s", ticker)
 	}
 	jsonData, err := json.Marshal(message)
 	if err != nil {
