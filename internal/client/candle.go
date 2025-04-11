@@ -55,18 +55,18 @@ func TrackTicker(ticker string, stopChan chan bool) error {
 	conn := database.NewConn()
 	defer conn.Close(ctx)
 	client := NewCoinbaseClient()
-	limit := 3
 
+	t := time.NewTicker(time.Duration(10) * time.Second)
+	defer t.Stop()
 	for {
 		select {
 		case <-stopChan:
 			log.Println("Stopped tracking", ticker)
 			return nil
-		default:
-			if err := LogRecentCandles(ctx, client, conn, ticker, limit); err != nil {
+		case _ = <-t.C:
+			if err := LogRecentCandles(ctx, client, conn, ticker, 3); err != nil {
 				return util.WrappedError{Err: err, Message: "Client-TrackTicker"}
 			}
-			time.Sleep(time.Duration(10) * time.Second)
 		}
 	}
 }

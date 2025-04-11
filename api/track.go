@@ -24,17 +24,15 @@ func NewTrackHandler(pool database.DBPool, tickerMap map[string]chan bool, mut *
 
 func (t *TrackHandler) Get(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")
+
 	t.mut.Lock()
 	_, exists := t.tickerMap[ticker]
 	t.mut.Unlock()
 
-	var message string
+	message := fmt.Sprintf("Not tracking %s", ticker)
 	if exists {
-		message = fmt.Sprintf("Already tracking %s", ticker)
-	} else {
-		message = fmt.Sprintf("Now tracking %s", ticker)
+		message = fmt.Sprintf("Currently tracking %s", ticker)
 	}
-
 	jsonData, err := json.Marshal(message)
 	if err != nil {
 		log.Panicf("Error: API-GetCandles-Marshal: %v", err)
@@ -46,7 +44,7 @@ func (t *TrackHandler) Post(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")
 
 	t.mut.Lock()
-	if len(t.tickerMap) > 2 {
+	if len(t.tickerMap) > 1 {
 		t.mut.Unlock()
 		util.WriteError(w, http.StatusServiceUnavailable)
 		return
@@ -56,7 +54,6 @@ func (t *TrackHandler) Post(w http.ResponseWriter, r *http.Request) {
 		util.WriteError(w, http.StatusConflict)
 		return
 	}
-
 	stopChan := make(chan bool)
 	t.tickerMap[ticker] = stopChan
 	t.mut.Unlock()
@@ -81,17 +78,14 @@ func (t *TrackHandler) Patch(w http.ResponseWriter, r *http.Request) {
 
 func (t *TrackHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")
+	message := fmt.Sprintf("Not tracking %s", ticker)
 
 	t.mut.Lock()
 	stopChan, exists := t.tickerMap[ticker]
-
-	var message string
 	if exists {
 		stopChan <- true
 		delete(t.tickerMap, ticker)
 		message = fmt.Sprintf("Stopped tracking %s", ticker)
-	} else {
-		message = fmt.Sprintf("Not tracking %s", ticker)
 	}
 	t.mut.Unlock()
 
