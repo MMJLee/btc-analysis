@@ -22,12 +22,12 @@ func BuildJWT(requestMethod, requestHost, requestPath string) (string, error) {
 
 	block, _ := pem.Decode([]byte(keySecret))
 	if block == nil {
-		return "", fmt.Errorf("jwt: Could not decode private key")
+		return "", fmt.Errorf("BuildJWT-Could not decode private key")
 	}
 
 	key, err := x509.ParseECPrivateKey(block.Bytes)
 	if err != nil {
-		return "", fmt.Errorf("jwt: %w", err)
+		return "", fmt.Errorf("BuildJWT-%w", err)
 	}
 
 	keyName := os.Getenv("COINBASE_API_KEY_NAME")
@@ -46,7 +46,7 @@ func BuildJWT(requestMethod, requestHost, requestPath string) (string, error) {
 
 	jwtString, err := token.SignedString(key)
 	if err != nil {
-		return "", fmt.Errorf("jwt: %w", err)
+		return "", fmt.Errorf("BuildJWT-%w", err)
 	}
 	return jwtString, nil
 }

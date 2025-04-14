@@ -2,14 +2,12 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/mmjlee/btc-analysis/internal/database"
-	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
 type CandleHandler struct {
@@ -28,45 +26,45 @@ func (c *CandleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	limit := queryParams.Get("limit")
 	offset := queryParams.Get("offset")
 	if ticker == "" || start == "" || end == "" || limit == "" || offset == "" {
-		log.Panic("Error: API-GetCandles: missing required query param")
+		log.Panic("Candle-Get: missing required query param")
 	}
 	missing, _ := strconv.ParseBool(queryParams.Get("missing"))
 	if missing { //make sure start epoch is truncated to the minute
 		startInt, err := strconv.ParseInt(start, 10, 64)
 		if err != nil {
-			fmt.Println("Error:", err)
+			WriteError(w, http.StatusBadRequest)
 			return
 		}
 		start = strconv.FormatInt(time.Unix(startInt, 0).Truncate(time.Minute).Unix(), 10)
 	}
 	candles, err := c.pool.GetCandles(r.Context(), ticker, start, end, limit, offset, missing)
 	if err != nil {
-		log.Panicf("Error: API-GetCandles-GetCandles: %v", err)
+		log.Panicf("Candle-Get-%v", err)
 	}
 	jsonData, err := json.Marshal(candles)
 	if err != nil {
-		log.Panicf("Error: API-GetCandles-Marshal: %v", err)
+		log.Panicf("Candle-Get-%v", err)
 	}
 	w.Write(jsonData)
 }
 
 func (c *CandleHandler) Post(w http.ResponseWriter, r *http.Request) {
-	util.WriteError(w, http.StatusNotImplemented)
+	WriteError(w, http.StatusNotImplemented)
 	return
 }
 
 func (c *CandleHandler) Put(w http.ResponseWriter, r *http.Request) {
-	util.WriteError(w, http.StatusNotImplemented)
+	WriteError(w, http.StatusNotImplemented)
 	return
 }
 
 func (c *CandleHandler) Patch(w http.ResponseWriter, r *http.Request) {
-	util.WriteError(w, http.StatusNotImplemented)
+	WriteError(w, http.StatusNotImplemented)
 	return
 }
 
 func (c *CandleHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	util.WriteError(w, http.StatusNotImplemented)
+	WriteError(w, http.StatusNotImplemented)
 	return
 }
 
@@ -81,4 +79,8 @@ func (c *CandleHandler) Handle(r *http.ServeMux) {
 	r.HandleFunc("PATCH /candle/{ticker}", c.Patch)
 	r.HandleFunc("DELETE /candle/{ticker}", c.Delete)
 	r.HandleFunc("OPTIONS /candle/{ticker}", c.Options)
+}
+
+func (c *CandleHandler) RequireAuth() bool {
+	return false
 }

@@ -19,14 +19,21 @@ func main() {
 
 	var wg sync.WaitGroup
 	decimal.MarshalJSONWithoutQuotes = true
-	tickerMap := make(map[string]chan bool)
-	ticker := *tickerPtr
+	trackMap := make(map[string]chan bool)
+	trackMut := new(sync.Mutex)
+	backfillMap := make(map[string]chan bool)
+	backfillMut := new(sync.Mutex)
 
-	switch *modePtr {
+	ticker := *tickerPtr
+	mode := *modePtr
+	start := *startPtr
+	end := *endPtr
+
+	switch mode {
 	case "log":
 		wg.Add(1)
 		stopChan := make(chan bool)
-		tickerMap[ticker] = stopChan
+		trackMap[ticker] = stopChan
 		go func() {
 			defer wg.Done()
 			client.TrackTicker(ticker, stopChan)
@@ -35,19 +42,25 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			go client.BackfillTicker(ticker, *startPtr, *endPtr, nil)
+			client.BackfillTicker(ticker, start, end, nil)
+			backfillMut.Lock()
+			delete(backfillMap, ticker)
+			backfillMut.Unlock()
 		}()
 	case "both":
 		wg.Add(2)
 		stopChan := make(chan bool)
-		tickerMap[ticker] = stopChan
+		trackMap[ticker] = stopChan
 		go func() {
 			defer wg.Done()
 			client.TrackTicker(ticker, stopChan)
 		}()
 		go func() {
 			defer wg.Done()
-			go client.BackfillTicker(ticker, *startPtr, *endPtr, nil)
+			client.BackfillTicker(ticker, start, end, nil)
+			backfillMut.Lock()
+			delete(backfillMap, ticker)
+			backfillMut.Unlock()
 		}()
 	}
 
@@ -55,9 +68,9 @@ func main() {
 	dbPool := database.NewPool()
 	defer dbPool.Close()
 	candleHandler := api.NewCandleHandler(dbPool)
-	trackMut := new(sync.Mutex)
-	trackHandler := api.NewTrackHandler(dbPool, tickerMap, trackMut)
-	server := api.GetServer(candleHandler, trackHandler)
+	trackHandler := api.NewTrackHandler(dbPool, trackMap, trackMut)
+	backfillHandler := api.NewBackfillHandler(dbPool, backfillMap, backfillMut)
+	server := api.GetServer(candleHandler, trackHandler, backfillHandler)
 	server.ListenAndServe()
 
 	wg.Wait()

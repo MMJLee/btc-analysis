@@ -1,4 +1,4 @@
-package util
+package api
 
 import (
 	"compress/gzip"
@@ -21,15 +21,6 @@ func CreateStack(middlewares ...Middleware) Middleware {
 		}
 		return next
 	}
-}
-
-func GetBaseMiddlewares() Middleware {
-	return CreateStack(
-		GzipMiddleware,
-		CORSMiddleware,
-		ErrorMiddleware,
-		LoggingMiddleware,
-	)
 }
 
 func ApplyMiddlewares(handler *http.ServeMux) http.Handler {
@@ -129,4 +120,9 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		req := r.WithContext(ctx)
 		next.ServeHTTP(w, req)
 	})
+}
+
+func WriteError(w http.ResponseWriter, statusCode int) {
+	w.WriteHeader(statusCode)
+	w.Write([]byte(http.StatusText(statusCode)))
 }
