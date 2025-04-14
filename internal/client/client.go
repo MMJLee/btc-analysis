@@ -1,12 +1,11 @@
 package client
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
 type CoinbaseClient struct {
@@ -20,12 +19,12 @@ func NewCoinbaseClient() CoinbaseClient {
 func NewRequest(method string, url url.URL, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest(method, url.String(), body)
 	if err != nil {
-		return req, util.WrappedError{Err: err, Message: "Client-NewRequest-NewRequest"}
+		return req, fmt.Errorf("NewRequest-%w", err)
 	}
 
 	jwt, err := BuildJWT(method, url.Host, url.Path)
 	if err != nil {
-		return req, util.WrappedError{Err: err, Message: "Client-NewRequest-BuildJWT"}
+		return req, fmt.Errorf("NewRequest-%w", err)
 	}
 
 	bearer := "Bearer " + jwt

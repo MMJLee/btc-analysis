@@ -8,7 +8,6 @@ import (
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
 type DBPool struct {
@@ -18,7 +17,7 @@ type DBPool struct {
 func NewPool() DBPool {
 	dbConfig, err := pgxpool.ParseConfig(os.Getenv("DATABASE_CONNECTION_STRING"))
 	if err != nil {
-		log.Panic(util.WrappedError{Err: err, Message: "Database-NewCandlePool-ParseConfig"}.Error())
+		log.Panic(err)
 	}
 	dbConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
 		pgxdecimal.Register(conn.TypeMap())
@@ -26,7 +25,7 @@ func NewPool() DBPool {
 	}
 	pool, err := pgxpool.NewWithConfig(context.Background(), dbConfig)
 	if err != nil {
-		log.Panic(util.WrappedError{Err: err, Message: "Database-NewCandlePool-NewWithConfig"}.Error())
+		log.Panic(err)
 	}
 	return DBPool{pool}
 }
@@ -38,7 +37,7 @@ type DBConn struct {
 func NewConn() DBConn {
 	conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_CONNECTION_STRING"))
 	if err != nil {
-		log.Panic(util.WrappedError{Err: err, Message: "Database-NewCandleConn-Connect"}.Error())
+		log.Panic(err)
 	}
 	pgxdecimal.Register(conn.TypeMap())
 	return DBConn{conn}

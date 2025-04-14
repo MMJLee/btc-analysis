@@ -9,24 +9,23 @@ import (
 
 	"github.com/mmjlee/btc-analysis/internal/client"
 	"github.com/mmjlee/btc-analysis/internal/database"
-	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
 type TrackHandler struct {
-	pool      database.DBPool
-	tickerMap map[string]chan bool
-	mut       *sync.Mutex
+	pool     database.DBPool
+	trackMap map[string]chan bool
+	mut      *sync.Mutex
 }
 
-func NewTrackHandler(pool database.DBPool, tickerMap map[string]chan bool, mut *sync.Mutex) *TrackHandler {
-	return &TrackHandler{pool: pool, tickerMap: tickerMap, mut: mut}
+func NewTrackHandler(pool database.DBPool, trackMap map[string]chan bool, mut *sync.Mutex) *TrackHandler {
+	return &TrackHandler{pool: pool, trackMap: trackMap, mut: mut}
 }
 
 func (t *TrackHandler) Get(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")
 
 	t.mut.Lock()
-	_, exists := t.tickerMap[ticker]
+	_, exists := t.trackMap[ticker]
 	t.mut.Unlock()
 
 	message := fmt.Sprintf("Not tracking %s", ticker)
@@ -35,7 +34,7 @@ func (t *TrackHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonData, err := json.Marshal(message)
 	if err != nil {
-		log.Panicf("Error: API-GetCandles-Marshal: %v", err)
+		log.Panicf("Track-Get-%w", err)
 	}
 	w.Write(jsonData)
 }
@@ -44,35 +43,35 @@ func (t *TrackHandler) Post(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")
 
 	t.mut.Lock()
-	if len(t.tickerMap) > 1 {
+	if len(t.trackMap) > 1 {
 		t.mut.Unlock()
-		util.WriteError(w, http.StatusServiceUnavailable)
+		WriteError(w, http.StatusServiceUnavailable)
 		return
 	}
-	if _, exists := t.tickerMap[ticker]; exists {
+	if _, exists := t.trackMap[ticker]; exists {
 		t.mut.Unlock()
-		util.WriteError(w, http.StatusConflict)
+		WriteError(w, http.StatusConflict)
 		return
 	}
 	stopChan := make(chan bool)
-	t.tickerMap[ticker] = stopChan
+	t.trackMap[ticker] = stopChan
 	t.mut.Unlock()
 
 	go client.TrackTicker(ticker, stopChan)
 	jsonData, err := json.Marshal(fmt.Sprintf("Now tracking %s", ticker))
 	if err != nil {
-		log.Panicf("Error: API-GetCandles-Marshal: %v", err)
+		log.Panicf("Track-Post-%w", err)
 	}
 	w.Write(jsonData)
 }
 
 func (t *TrackHandler) Put(w http.ResponseWriter, r *http.Request) {
-	util.WriteError(w, http.StatusNotImplemented)
+	WriteError(w, http.StatusNotImplemented)
 	return
 }
 
 func (t *TrackHandler) Patch(w http.ResponseWriter, r *http.Request) {
-	util.WriteError(w, http.StatusNotImplemented)
+	WriteError(w, http.StatusNotImplemented)
 	return
 }
 
@@ -81,22 +80,22 @@ func (t *TrackHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	message := fmt.Sprintf("Not tracking %s", ticker)
 
 	t.mut.Lock()
-	stopChan, exists := t.tickerMap[ticker]
+	stopChan, exists := t.trackMap[ticker]
 	if exists {
 		stopChan <- true
-		delete(t.tickerMap, ticker)
+		delete(t.trackMap, ticker)
 		message = fmt.Sprintf("Stopped tracking %s", ticker)
 	}
 	t.mut.Unlock()
 
 	jsonData, err := json.Marshal(message)
 	if err != nil {
-		log.Panicf("Error: API-GetCandles-Marshal: %v", err)
+		log.Panicf("Track-Delete-%w", err)
 	}
 	w.Write(jsonData)
 }
 
-func (c *TrackHandler) Options(w http.ResponseWriter, r *http.Request) {
+func (t *TrackHandler) Options(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
@@ -107,4 +106,8 @@ func (t *TrackHandler) Handle(r *http.ServeMux) {
 	r.HandleFunc("PATCH /track/{ticker}", t.Patch)
 	r.HandleFunc("DELETE /track/{ticker}", t.Delete)
 	r.HandleFunc("OPTIONS /track/{ticker}", t.Options)
+}
+
+func (t *TrackHandler) RequireAuth() bool {
+	return true
 }

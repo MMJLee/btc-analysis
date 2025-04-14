@@ -3,36 +3,40 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"strconv"
 	"time"
 
 	"github.com/mmjlee/btc-analysis/internal/database"
-	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
-func (c CoinbaseClient) GetCandles(ticker, start, end, limit string) (util.CandleResponse, error) {
-	var candlesResponse util.CandleResponse
-	candleUrl := util.GetProductCandleUrl(ticker, start, end, "ONE_MINUTE", limit)
+type CandleResponse struct {
+	Candles database.CandleSlice `json:"candles"`
+}
+
+func (c CoinbaseClient) GetCandles(ticker, start, end, limit string) (CandleResponse, error) {
+	var candlesResponse CandleResponse
+	candleUrl := GetProductCandleUrl(ticker, start, end, "ONE_MINUTE", limit)
 	req, err := NewRequest("GET", candleUrl, nil)
 	if err != nil {
-		return candlesResponse, util.WrappedError{Err: err, Message: "Client-GetCandles-NewRequest"}
+		return candlesResponse, fmt.Errorf("GetCandles-%w", err)
 	}
 	resp, err := c.Do(req)
 	if err != nil {
-		return candlesResponse, util.WrappedError{Err: err, Message: "Client-GetCandles-Do"}
+		return candlesResponse, fmt.Errorf("GetCandles-%w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return candlesResponse, util.WrappedError{Err: err, Message: "Client-GetCandles-ReadAll"}
+		return candlesResponse, fmt.Errorf("GetCandles-%w", err)
 	}
 
 	err = json.Unmarshal([]byte(body), &candlesResponse)
 	if err != nil {
-		return candlesResponse, util.WrappedError{Err: err, Message: "Client-GetCandles-Unmarshal"}
+		return candlesResponse, fmt.Errorf("GetCandles-%w", err)
 	}
 	return candlesResponse, nil
 }
@@ -42,15 +46,15 @@ func LogRecentCandles(ctx context.Context, client CoinbaseClient, conn database.
 	start := now.Add(time.Duration(-limit)*time.Minute + time.Second).Unix()
 	candlesResponse, err := client.GetCandles(ticker, strconv.FormatInt(start, 10), strconv.FormatInt(now.Unix(), 10), strconv.Itoa(limit))
 	if err != nil {
-		return util.WrappedError{Err: err, Message: "Client-LogCandles-GetCandles"}
+		return fmt.Errorf("LogRecentCandles-%w", err)
 	}
 	if err := conn.InsertCandles(ctx, ticker, candlesResponse.Candles); err != nil {
-		return util.WrappedError{Err: err, Message: "Client-LogCandles-InsertCandles"}
+		return fmt.Errorf("LogRecentCandles-%w", err)
 	}
 	return nil
 }
 
-func TrackTicker(ticker string, stopChan chan bool) error {
+func TrackTicker(ticker string, stopChan chan bool) {
 	ctx := context.Background()
 	conn := database.NewConn()
 	defer conn.Close(ctx)
@@ -62,10 +66,9 @@ func TrackTicker(ticker string, stopChan chan bool) error {
 		select {
 		case <-stopChan:
 			log.Println("Stopped tracking", ticker)
-			return nil
 		case _ = <-t.C:
 			if err := LogRecentCandles(ctx, client, conn, ticker, 3); err != nil {
-				return util.WrappedError{Err: err, Message: "Client-TrackTicker"}
+				log.Panic(err)
 			}
 		}
 	}
@@ -74,15 +77,15 @@ func TrackTicker(ticker string, stopChan chan bool) error {
 func BackfillCandles(ctx context.Context, client CoinbaseClient, conn database.DBConn, ticker string, start, stop, limit int64) error {
 	candlesResponse, err := client.GetCandles(ticker, strconv.FormatInt(start, 10), strconv.FormatInt(stop, 10), strconv.FormatInt(limit, 10))
 	if err != nil {
-		return util.WrappedError{Err: err, Message: "Client-BackfillCandles-GetCandles"}
+		return fmt.Errorf("BackfillCandles-%w", err)
 	}
 	if err := conn.BulkLogCandles(ctx, ticker, candlesResponse.Candles); err != nil {
-		return util.WrappedError{Err: err, Message: "Client-BackfillCandles-BulkLogCandles"}
+		return fmt.Errorf("BackfillCandles-%w", err)
 	}
 	return nil
 }
 
-func BackfillTicker(ticker string, start, stop int64, stopChan chan bool) error {
+func BackfillTicker(ticker string, start, stop int64, stopChan chan bool) {
 	ctx := context.Background()
 	conn := database.NewConn()
 	defer conn.Close(ctx)
@@ -92,13 +95,11 @@ func BackfillTicker(ticker string, start, stop int64, stopChan chan bool) error 
 		select {
 		case <-stopChan:
 			log.Println("Stopped backfilling", ticker)
-			return nil
 		default:
 			if err := BackfillCandles(ctx, client, conn, ticker, t, (t + (limit * 60) - 1), limit); err != nil {
-				return util.WrappedError{Err: err, Message: "Client-BackfillTicker-BackfillCandles"}
+				log.Panic(err)
 			}
 			time.Sleep(time.Duration(150) * time.Millisecond)
 		}
 	}
-	return nil
 }

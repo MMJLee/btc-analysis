@@ -2,31 +2,36 @@ package api
 
 import (
 	"net/http"
-
-	"github.com/mmjlee/btc-analysis/internal/util"
 )
 
 type Handler interface {
-	Handle(r *http.ServeMux)
 	Get(w http.ResponseWriter, r *http.Request)
 	Post(w http.ResponseWriter, r *http.Request)
 	Put(w http.ResponseWriter, r *http.Request)
 	Patch(w http.ResponseWriter, r *http.Request)
 	Delete(w http.ResponseWriter, r *http.Request)
 	Options(w http.ResponseWriter, r *http.Request)
+	Handle(r *http.ServeMux)
+	RequireAuth() bool
 }
 
 func GetServer(handlers ...Handler) http.Server {
-	baseHandler := http.NewServeMux()
+	baseMux := http.NewServeMux()
+	adminMux := http.NewServeMux()
+
 	for _, h := range handlers {
-		h.Handle(baseHandler)
+		if h.RequireAuth() {
+			h.Handle(adminMux)
+		} else {
+			h.Handle(baseMux)
+		}
 	}
-	handler := util.ApplyMiddlewares(baseHandler)
-	// admin_router := http.NewServeMux()
-	// admin_router.HandleFunc("PUT /candle/{ticker}", c.GetCandles)
-	// router.Handle("/", util.AuthMiddleware(admin_router))
+
+	baseMux.Handle("/", AuthMiddleware(adminMux))
+	middledMux := ApplyMiddlewares(baseMux)
+
 	v1 := http.NewServeMux()
-	v1.Handle("/v1/", http.StripPrefix("/v1", handler))
+	v1.Handle("/v1/", http.StripPrefix("/v1", middledMux))
 	return http.Server{
 		Addr:    "0.0.0.0:8080",
 		Handler: v1,
