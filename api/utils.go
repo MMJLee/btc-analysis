@@ -8,13 +8,15 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 const AUTH_USER = "middleware.auth.user"
 
 type Middleware func(http.Handler) http.Handler
 
-func CreateStack(middlewares ...Middleware) Middleware {
+func createStack(middlewares ...Middleware) Middleware {
 	return func(next http.Handler) http.Handler {
 		for _, middleware := range middlewares {
 			next = middleware(next)
@@ -23,12 +25,12 @@ func CreateStack(middlewares ...Middleware) Middleware {
 	}
 }
 
-func ApplyMiddlewares(handler *http.ServeMux) http.Handler {
-	middlewares := CreateStack(
-		GzipMiddleware,
-		CORSMiddleware,
-		ErrorMiddleware,
-		LoggingMiddleware,
+func applyMiddlewares(handler *http.ServeMux) http.Handler {
+	middlewares := createStack(
+		gzipMiddleware,
+		corsMiddleware,
+		errorMiddleware,
+		loggingMiddleware,
 	)
 	return middlewares(handler)
 }
@@ -43,12 +45,12 @@ func (w *wrappedWriter) WriteHeader(statusCode int) {
 	w.statusCode = statusCode
 }
 
-func ErrorMiddleware(next http.Handler) http.Handler {
+func errorMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Println(err)
-				WriteError(w, http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError)
 				return
 			}
 		}()
@@ -56,7 +58,7 @@ func ErrorMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func LoggingMiddleware(next http.Handler) http.Handler {
+func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		wrapped := &wrappedWriter{
@@ -68,7 +70,7 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func CORSMiddleware(next http.Handler) http.Handler {
+func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "https://mjlee.dev")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
@@ -90,7 +92,7 @@ type gzipResponseWriter struct {
 func (grw *gzipResponseWriter) Write(p []byte) (n int, err error) {
 	return grw.Writer.Write(p)
 }
-func GzipMiddleware(next http.Handler) http.Handler {
+func gzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			gz := gzip.NewWriter(w)
@@ -107,12 +109,12 @@ func GzipMiddleware(next http.Handler) http.Handler {
 }
 
 // WIP
-func AuthMiddleware(next http.Handler) http.Handler {
+func authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authorization := r.Header.Get("Authorization")
 		token, err := base64.StdEncoding.DecodeString(authorization)
-		if err != nil {
-			WriteError(w, http.StatusUnauthorized)
+		if err != nil || authorization == "" {
+			writeError(w, http.StatusUnauthorized)
 			return
 		}
 		userID := string(token)
@@ -122,7 +124,18 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func WriteError(w http.ResponseWriter, statusCode int) {
+func writeError(w http.ResponseWriter, statusCode int) {
 	w.WriteHeader(statusCode)
 	w.Write([]byte(http.StatusText(statusCode)))
+}
+
+func hashPassword(password string) (string, error) {
+	// salting done by bcrypt
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 10)
+	return string(bytes), err
+}
+
+func checkHash(hashedPassword, password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+	return err == nil
 }

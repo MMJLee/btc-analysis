@@ -22,7 +22,7 @@ func NewRequest(method string, url url.URL, body io.Reader) (*http.Request, erro
 		return req, fmt.Errorf("NewRequest-%w", err)
 	}
 
-	jwt, err := BuildJWT(method, url.Host, url.Path)
+	jwt, err := buildJWT(method, url.Host, url.Path)
 	if err != nil {
 		return req, fmt.Errorf("NewRequest-%w", err)
 	}

@@ -5,7 +5,7 @@ import (
 	"net/url"
 )
 
-func GetProductCandleUrl(ticker, start, end, granularity, limit string) url.URL {
+func getProductCandleUrl(ticker, start, end, granularity, limit string) url.URL {
 	params := url.Values{}
 	params.Add("start", start)
 	params.Add("end", end)
