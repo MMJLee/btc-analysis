@@ -16,9 +16,9 @@ type CandleResponse struct {
 	Candles database.CandleSlice `json:"candles"`
 }
 
-func (c CoinbaseClient) GetCandles(ticker, start, end, limit string) (CandleResponse, error) {
+func (c CoinbaseClient) getCandles(ticker, start, end, limit string) (CandleResponse, error) {
 	var candlesResponse CandleResponse
-	candleUrl := GetProductCandleUrl(ticker, start, end, "ONE_MINUTE", limit)
+	candleUrl := getProductCandleUrl(ticker, start, end, "ONE_MINUTE", limit)
 	req, err := NewRequest("GET", candleUrl, nil)
 	if err != nil {
 		return candlesResponse, fmt.Errorf("GetCandles-%w", err)
@@ -41,10 +41,10 @@ func (c CoinbaseClient) GetCandles(ticker, start, end, limit string) (CandleResp
 	return candlesResponse, nil
 }
 
-func LogRecentCandles(ctx context.Context, client CoinbaseClient, conn database.DBConn, ticker string, limit int) error {
+func logRecentCandles(ctx context.Context, client CoinbaseClient, conn database.DBConn, ticker string, limit int) error {
 	now := time.Now()
 	start := now.Add(time.Duration(-limit)*time.Minute + time.Second).Unix()
-	candlesResponse, err := client.GetCandles(ticker, strconv.FormatInt(start, 10), strconv.FormatInt(now.Unix(), 10), strconv.Itoa(limit))
+	candlesResponse, err := client.getCandles(ticker, strconv.FormatInt(start, 10), strconv.FormatInt(now.Unix(), 10), strconv.Itoa(limit))
 	if err != nil {
 		return fmt.Errorf("LogRecentCandles-%w", err)
 	}
@@ -67,15 +67,15 @@ func TrackTicker(ticker string, stopChan chan bool) {
 		case <-stopChan:
 			log.Println("Stopped tracking", ticker)
 		case _ = <-t.C:
-			if err := LogRecentCandles(ctx, client, conn, ticker, 3); err != nil {
+			if err := logRecentCandles(ctx, client, conn, ticker, 3); err != nil {
 				log.Panic(err)
 			}
 		}
 	}
 }
 
-func BackfillCandles(ctx context.Context, client CoinbaseClient, conn database.DBConn, ticker string, start, stop, limit int64) error {
-	candlesResponse, err := client.GetCandles(ticker, strconv.FormatInt(start, 10), strconv.FormatInt(stop, 10), strconv.FormatInt(limit, 10))
+func backfillCandles(ctx context.Context, client CoinbaseClient, conn database.DBConn, ticker string, start, stop, limit int64) error {
+	candlesResponse, err := client.getCandles(ticker, strconv.FormatInt(start, 10), strconv.FormatInt(stop, 10), strconv.FormatInt(limit, 10))
 	if err != nil {
 		return fmt.Errorf("BackfillCandles-%w", err)
 	}
@@ -96,7 +96,7 @@ func BackfillTicker(ticker string, start, stop int64, stopChan chan bool) {
 		case <-stopChan:
 			log.Println("Stopped backfilling", ticker)
 		default:
-			if err := BackfillCandles(ctx, client, conn, ticker, t, (t + (limit * 60) - 1), limit); err != nil {
+			if err := backfillCandles(ctx, client, conn, ticker, t, (t + (limit * 60) - 1), limit); err != nil {
 				log.Panic(err)
 			}
 			time.Sleep(time.Duration(150) * time.Millisecond)

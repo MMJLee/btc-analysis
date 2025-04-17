@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"sync"
@@ -22,7 +21,11 @@ func NewBackfillHandler(pool database.DBPool, tickerMap map[string]chan bool, mu
 	return &BackfillHandler{pool: pool, tickerMap: tickerMap, mut: mut}
 }
 
-func (b *BackfillHandler) Get(w http.ResponseWriter, r *http.Request) {
+func (b *BackfillHandler) requireAuth() bool {
+	return true
+}
+
+func (b *BackfillHandler) get(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")
 
 	b.mut.Lock()
@@ -35,35 +38,36 @@ func (b *BackfillHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonData, err := json.Marshal(message)
 	if err != nil {
-		log.Panicf("Backfill-Get-%v", err)
+		writeError(w, http.StatusInternalServerError)
+		return
 	}
 	w.Write(jsonData)
 }
 
-func (b *BackfillHandler) Post(w http.ResponseWriter, r *http.Request) {
+func (b *BackfillHandler) post(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")
 	queryParams := r.URL.Query()
 	start := queryParams.Get("start")
 	end := queryParams.Get("end")
 	startInt, err := strconv.ParseInt(start, 10, 64)
 	if err != nil {
-		WriteError(w, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest)
 		return
 	}
 	endInt, err := strconv.ParseInt(end, 10, 64)
 	if err != nil {
-		WriteError(w, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest)
 		return
 	}
 	b.mut.Lock()
 	if len(b.tickerMap) > 1 {
 		b.mut.Unlock()
-		WriteError(w, http.StatusServiceUnavailable)
+		writeError(w, http.StatusServiceUnavailable)
 		return
 	}
 	if _, exists := b.tickerMap[ticker]; exists {
 		b.mut.Unlock()
-		WriteError(w, http.StatusConflict)
+		writeError(w, http.StatusConflict)
 		return
 	}
 	stopChan := make(chan bool)
@@ -78,22 +82,21 @@ func (b *BackfillHandler) Post(w http.ResponseWriter, r *http.Request) {
 	}()
 	jsonData, err := json.Marshal(fmt.Sprintf("Now backfilling %s", ticker))
 	if err != nil {
-		log.Panicf("Backfill-Post-%w", err)
+		writeError(w, http.StatusInternalServerError)
+		return
 	}
 	w.Write(jsonData)
 }
 
-func (b *BackfillHandler) Put(w http.ResponseWriter, r *http.Request) {
-	WriteError(w, http.StatusNotImplemented)
-	return
+func (b *BackfillHandler) put(w http.ResponseWriter, r *http.Request) {
+	writeError(w, http.StatusNotImplemented)
 }
 
-func (b *BackfillHandler) Patch(w http.ResponseWriter, r *http.Request) {
-	WriteError(w, http.StatusNotImplemented)
-	return
+func (b *BackfillHandler) patch(w http.ResponseWriter, r *http.Request) {
+	writeError(w, http.StatusNotImplemented)
 }
 
-func (b *BackfillHandler) Delete(w http.ResponseWriter, r *http.Request) {
+func (b *BackfillHandler) delete(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")
 	message := fmt.Sprintf("Not backfilling %s", ticker)
 
@@ -108,25 +111,20 @@ func (b *BackfillHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	jsonData, err := json.Marshal(message)
 	if err != nil {
-		log.Panicf("Backfill-Delete-%w", err)
-
+		writeError(w, http.StatusInternalServerError)
+		return
 	}
 	w.Write(jsonData)
 }
 
-func (b *BackfillHandler) Options(w http.ResponseWriter, r *http.Request) {
-	return
+func (b *BackfillHandler) options(w http.ResponseWriter, r *http.Request) {
 }
 
-func (b *BackfillHandler) Handle(r *http.ServeMux) {
-	r.HandleFunc("GET /backfill/{ticker}", b.Get)
-	r.HandleFunc("POST /backfill/{ticker}", b.Post)
-	r.HandleFunc("PUT /backfill/{ticker}", b.Put)
-	r.HandleFunc("PATCH /backfill/{ticker}", b.Patch)
-	r.HandleFunc("DELETE /backfill/{ticker}", b.Delete)
-	r.HandleFunc("OPTIONS /backfill/{ticker}", b.Options)
-}
-
-func (b *BackfillHandler) RequireAuth() bool {
-	return true
+func (b *BackfillHandler) handle(r *http.ServeMux) {
+	r.HandleFunc("GET /backfill/{ticker}", b.get)
+	r.HandleFunc("POST /backfill/{ticker}", b.post)
+	r.HandleFunc("PUT /backfill/{ticker}", b.put)
+	r.HandleFunc("PATCH /backfill/{ticker}", b.patch)
+	r.HandleFunc("DELETE /backfill/{ticker}", b.delete)
+	r.HandleFunc("OPTIONS /backfill/{ticker}", b.options)
 }

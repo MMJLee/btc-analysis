@@ -16,7 +16,7 @@ type APIKeyClaims struct {
 	URI string `json:"uri"`
 }
 
-func BuildJWT(requestMethod, requestHost, requestPath string) (string, error) {
+func buildJWT(requestMethod, requestHost, requestPath string) (string, error) {
 	uri := fmt.Sprintf("%s %s%s", requestMethod, requestHost, requestPath)
 	keySecret := strings.ReplaceAll(os.Getenv("COINBASE_API_KEY_SECRET"), "\\n", "\n")
 

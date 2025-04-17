@@ -26,12 +26,12 @@ type CandleSliceWithTicker struct {
 
 func (repo DBPool) GetCandles(c context.Context, ticker, start, end, limit, offset string, missing bool) (CandleSlice, error) {
 	query := `
-	SELECT ticker, "start", "open", high, low, "close", volume
-	FROM candle_one_minute 
-	WHERE ticker = $1 
-	AND "start" BETWEEN $2 AND $3
-	ORDER BY ticker, "start"
-	LIMIT $4 OFFSET $5;
+		SELECT ticker, "start", "open", high, low, "close", volume
+		FROM candle_one_minute 
+		WHERE ticker = $1 
+		AND "start" BETWEEN $2 AND $3
+		ORDER BY ticker, "start"
+		LIMIT $4 OFFSET $5;
 	`
 	if missing {
 		query = `

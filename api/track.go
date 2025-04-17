@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 
@@ -21,7 +20,11 @@ func NewTrackHandler(pool database.DBPool, trackMap map[string]chan bool, mut *s
 	return &TrackHandler{pool: pool, trackMap: trackMap, mut: mut}
 }
 
-func (t *TrackHandler) Get(w http.ResponseWriter, r *http.Request) {
+func (t *TrackHandler) requireAuth() bool {
+	return true
+}
+
+func (t *TrackHandler) get(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")
 
 	t.mut.Lock()
@@ -34,23 +37,24 @@ func (t *TrackHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonData, err := json.Marshal(message)
 	if err != nil {
-		log.Panicf("Track-Get-%w", err)
+		writeError(w, http.StatusInternalServerError)
+		return
 	}
 	w.Write(jsonData)
 }
 
-func (t *TrackHandler) Post(w http.ResponseWriter, r *http.Request) {
+func (t *TrackHandler) post(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")
 
 	t.mut.Lock()
 	if len(t.trackMap) > 1 {
 		t.mut.Unlock()
-		WriteError(w, http.StatusServiceUnavailable)
+		writeError(w, http.StatusServiceUnavailable)
 		return
 	}
 	if _, exists := t.trackMap[ticker]; exists {
 		t.mut.Unlock()
-		WriteError(w, http.StatusConflict)
+		writeError(w, http.StatusConflict)
 		return
 	}
 	stopChan := make(chan bool)
@@ -60,22 +64,21 @@ func (t *TrackHandler) Post(w http.ResponseWriter, r *http.Request) {
 	go client.TrackTicker(ticker, stopChan)
 	jsonData, err := json.Marshal(fmt.Sprintf("Now tracking %s", ticker))
 	if err != nil {
-		log.Panicf("Track-Post-%w", err)
+		writeError(w, http.StatusInternalServerError)
+		return
 	}
 	w.Write(jsonData)
 }
 
-func (t *TrackHandler) Put(w http.ResponseWriter, r *http.Request) {
-	WriteError(w, http.StatusNotImplemented)
-	return
+func (t *TrackHandler) put(w http.ResponseWriter, r *http.Request) {
+	writeError(w, http.StatusNotImplemented)
 }
 
-func (t *TrackHandler) Patch(w http.ResponseWriter, r *http.Request) {
-	WriteError(w, http.StatusNotImplemented)
-	return
+func (t *TrackHandler) patch(w http.ResponseWriter, r *http.Request) {
+	writeError(w, http.StatusNotImplemented)
 }
 
-func (t *TrackHandler) Delete(w http.ResponseWriter, r *http.Request) {
+func (t *TrackHandler) delete(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")
 	message := fmt.Sprintf("Not tracking %s", ticker)
 
@@ -90,24 +93,20 @@ func (t *TrackHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	jsonData, err := json.Marshal(message)
 	if err != nil {
-		log.Panicf("Track-Delete-%w", err)
+		writeError(w, http.StatusInternalServerError)
+		return
 	}
 	w.Write(jsonData)
 }
 
-func (t *TrackHandler) Options(w http.ResponseWriter, r *http.Request) {
-	return
+func (t *TrackHandler) options(w http.ResponseWriter, r *http.Request) {
 }
 
-func (t *TrackHandler) Handle(r *http.ServeMux) {
-	r.HandleFunc("GET /track/{ticker}", t.Get)
-	r.HandleFunc("POST /track/{ticker}", t.Post)
-	r.HandleFunc("PUT /track/{ticker}", t.Put)
-	r.HandleFunc("PATCH /track/{ticker}", t.Patch)
-	r.HandleFunc("DELETE /track/{ticker}", t.Delete)
-	r.HandleFunc("OPTIONS /track/{ticker}", t.Options)
-}
-
-func (t *TrackHandler) RequireAuth() bool {
-	return true
+func (t *TrackHandler) handle(r *http.ServeMux) {
+	r.HandleFunc("GET /track/{ticker}", t.get)
+	r.HandleFunc("POST /track/{ticker}", t.post)
+	r.HandleFunc("PUT /track/{ticker}", t.put)
+	r.HandleFunc("PATCH /track/{ticker}", t.patch)
+	r.HandleFunc("DELETE /track/{ticker}", t.delete)
+	r.HandleFunc("OPTIONS /track/{ticker}", t.options)
 }

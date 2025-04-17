@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -18,7 +17,11 @@ func NewCandleHandler(pool database.DBPool) *CandleHandler {
 	return &CandleHandler{pool: pool}
 }
 
-func (c *CandleHandler) Get(w http.ResponseWriter, r *http.Request) {
+func (c *CandleHandler) requireAuth() bool {
+	return false
+}
+
+func (c *CandleHandler) get(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")
 	queryParams := r.URL.Query()
 	start := queryParams.Get("start")
@@ -26,61 +29,55 @@ func (c *CandleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	limit := queryParams.Get("limit")
 	offset := queryParams.Get("offset")
 	if ticker == "" || start == "" || end == "" || limit == "" || offset == "" {
-		log.Panic("Candle-Get: missing required query param")
+		writeError(w, http.StatusBadRequest)
+		return
 	}
 	missing, _ := strconv.ParseBool(queryParams.Get("missing"))
 	if missing { //make sure start epoch is truncated to the minute
 		startInt, err := strconv.ParseInt(start, 10, 64)
 		if err != nil {
-			WriteError(w, http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest)
 			return
 		}
 		start = strconv.FormatInt(time.Unix(startInt, 0).Truncate(time.Minute).Unix(), 10)
 	}
 	candles, err := c.pool.GetCandles(r.Context(), ticker, start, end, limit, offset, missing)
 	if err != nil {
-		log.Panicf("Candle-Get-%v", err)
+		writeError(w, http.StatusInternalServerError)
+		return
 	}
 	jsonData, err := json.Marshal(candles)
 	if err != nil {
-		log.Panicf("Candle-Get-%v", err)
+		writeError(w, http.StatusInternalServerError)
+		return
 	}
 	w.Write(jsonData)
 }
 
-func (c *CandleHandler) Post(w http.ResponseWriter, r *http.Request) {
-	WriteError(w, http.StatusNotImplemented)
-	return
+func (c *CandleHandler) post(w http.ResponseWriter, r *http.Request) {
+	writeError(w, http.StatusNotImplemented)
 }
 
-func (c *CandleHandler) Put(w http.ResponseWriter, r *http.Request) {
-	WriteError(w, http.StatusNotImplemented)
-	return
+func (c *CandleHandler) put(w http.ResponseWriter, r *http.Request) {
+	writeError(w, http.StatusNotImplemented)
 }
 
-func (c *CandleHandler) Patch(w http.ResponseWriter, r *http.Request) {
-	WriteError(w, http.StatusNotImplemented)
-	return
+func (c *CandleHandler) patch(w http.ResponseWriter, r *http.Request) {
+	writeError(w, http.StatusNotImplemented)
 }
 
-func (c *CandleHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	WriteError(w, http.StatusNotImplemented)
-	return
+func (c *CandleHandler) delete(w http.ResponseWriter, r *http.Request) {
+	writeError(w, http.StatusNotImplemented)
 }
 
-func (c *CandleHandler) Options(w http.ResponseWriter, r *http.Request) {
-	return
+func (c *CandleHandler) options(w http.ResponseWriter, r *http.Request) {
 }
 
-func (c *CandleHandler) Handle(r *http.ServeMux) {
-	r.HandleFunc("GET /candle/{ticker}", c.Get)
-	r.HandleFunc("POST /candle/{ticker}", c.Post)
-	r.HandleFunc("PUT /candle/{ticker}", c.Put)
-	r.HandleFunc("PATCH /candle/{ticker}", c.Patch)
-	r.HandleFunc("DELETE /candle/{ticker}", c.Delete)
-	r.HandleFunc("OPTIONS /candle/{ticker}", c.Options)
-}
-
-func (c *CandleHandler) RequireAuth() bool {
-	return false
+func (c *CandleHandler) handle(r *http.ServeMux) {
+	r.HandleFunc("GET /candle/{ticker}", c.get)
+	r.HandleFunc("POST /candle/{ticker}", c.post)
+	r.HandleFunc("PUT /candle/{ticker}", c.put)
+	r.HandleFunc("PATCH /candle/{ticker}", c.patch)
+	r.HandleFunc("DELETE /candle/{ticker}", c.delete)
+	r.HandleFunc("OPTIONS /candle/{ticker}", c.options)
 }

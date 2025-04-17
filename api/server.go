@@ -5,14 +5,14 @@ import (
 )
 
 type Handler interface {
-	Get(w http.ResponseWriter, r *http.Request)
-	Post(w http.ResponseWriter, r *http.Request)
-	Put(w http.ResponseWriter, r *http.Request)
-	Patch(w http.ResponseWriter, r *http.Request)
-	Delete(w http.ResponseWriter, r *http.Request)
-	Options(w http.ResponseWriter, r *http.Request)
-	Handle(r *http.ServeMux)
-	RequireAuth() bool
+	requireAuth() bool
+	get(w http.ResponseWriter, r *http.Request)
+	post(w http.ResponseWriter, r *http.Request)
+	put(w http.ResponseWriter, r *http.Request)
+	patch(w http.ResponseWriter, r *http.Request)
+	delete(w http.ResponseWriter, r *http.Request)
+	options(w http.ResponseWriter, r *http.Request)
+	handle(r *http.ServeMux)
 }
 
 func GetServer(handlers ...Handler) http.Server {
@@ -20,15 +20,15 @@ func GetServer(handlers ...Handler) http.Server {
 	adminMux := http.NewServeMux()
 
 	for _, h := range handlers {
-		if h.RequireAuth() {
-			h.Handle(adminMux)
+		if h.requireAuth() {
+			h.handle(adminMux)
 		} else {
-			h.Handle(baseMux)
+			h.handle(baseMux)
 		}
 	}
 
-	baseMux.Handle("/", AuthMiddleware(adminMux))
-	middledMux := ApplyMiddlewares(baseMux)
+	baseMux.Handle("/", authMiddleware(adminMux))
+	middledMux := applyMiddlewares(baseMux)
 
 	v1 := http.NewServeMux()
 	v1.Handle("/v1/", http.StripPrefix("/v1", middledMux))
