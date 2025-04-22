@@ -14,7 +14,7 @@ type CandleHandler struct {
 }
 
 func NewCandleHandler(pool database.DBPool) *CandleHandler {
-	return &CandleHandler{pool: pool}
+	return &CandleHandler{pool}
 }
 
 func (c *CandleHandler) requireAuth() bool {

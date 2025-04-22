@@ -3,16 +3,21 @@ package api
 import (
 	"compress/gzip"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/mmjlee/btc-analysis/internal/database"
 	"golang.org/x/crypto/bcrypt"
 )
 
 const AUTH_USER = "middleware.auth.user"
+const SESSION_TOKEN = "mjlee_session_token"
+const CSRF_TOKEN = "mjlee_csrf_token"
 
 type Middleware func(http.Handler) http.Handler
 
@@ -108,17 +113,42 @@ func gzipMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// WIP
-func authMiddleware(next http.Handler) http.Handler {
+type SessionData struct {
+	username     string
+	csrfToken    string
+	sessionToken string
+}
+
+func authMiddleware(next http.Handler, rdb database.RedisClient) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authorization := r.Header.Get("Authorization")
-		token, err := base64.StdEncoding.DecodeString(authorization)
-		if err != nil || authorization == "" {
+		username := r.FormValue("username")
+
+		csrfToken := r.Header.Get("X-CSRF-Token")
+		if csrfToken == "" {
 			writeError(w, http.StatusUnauthorized)
 			return
 		}
-		userID := string(token)
-		ctx := context.WithValue(r.Context(), AUTH_USER, userID)
+
+		sessionToken, err := r.Cookie(SESSION_TOKEN)
+		if err != nil || sessionToken.Value == "" {
+			writeError(w, http.StatusUnauthorized)
+			return
+		}
+
+		var sessionData SessionData
+		val, err := rdb.Get(r.Context(), username).Result()
+		err = json.Unmarshal([]byte(val), &sessionData)
+		if err != nil {
+			writeError(w, http.StatusUnauthorized)
+			return
+		}
+
+		if username != sessionData.username || csrfToken != sessionData.csrfToken || sessionToken.Value != sessionData.sessionToken {
+			writeError(w, http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), AUTH_USER, username)
 		req := r.WithContext(ctx)
 		next.ServeHTTP(w, req)
 	})
@@ -138,4 +168,12 @@ func hashPassword(password string) (string, error) {
 func checkHash(hashedPassword, password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	return err == nil
+}
+
+func generateToken(length int) string {
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		log.Panic("generateToken")
+	}
+	return base64.URLEncoding.EncodeToString(bytes)
 }

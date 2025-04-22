@@ -8,6 +8,7 @@ import (
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 type DBPool struct {
@@ -41,4 +42,17 @@ func NewConn() DBConn {
 	}
 	pgxdecimal.Register(conn.TypeMap())
 	return DBConn{conn}
+}
+
+type RedisClient struct {
+	*redis.Client
+}
+
+func NewRedis() RedisClient {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+	})
+	return RedisClient{rdb}
 }
