@@ -18,7 +18,7 @@ type BackfillHandler struct {
 }
 
 func NewBackfillHandler(pool database.DBPool, tickerMap map[string]chan bool, mut *sync.Mutex) *BackfillHandler {
-	return &BackfillHandler{pool: pool, tickerMap: tickerMap, mut: mut}
+	return &BackfillHandler{pool, tickerMap, mut}
 }
 
 func (b *BackfillHandler) requireAuth() bool {

@@ -2,6 +2,8 @@ package api
 
 import (
 	"net/http"
+
+	"github.com/mmjlee/btc-analysis/internal/database"
 )
 
 type Handler interface {
@@ -15,7 +17,7 @@ type Handler interface {
 	handle(r *http.ServeMux)
 }
 
-func GetServer(handlers ...Handler) http.Server {
+func GetServer(redis database.RedisClient, handlers ...Handler) http.Server {
 	baseMux := http.NewServeMux()
 	adminMux := http.NewServeMux()
 
@@ -27,7 +29,7 @@ func GetServer(handlers ...Handler) http.Server {
 		}
 	}
 
-	baseMux.Handle("/", authMiddleware(adminMux))
+	baseMux.Handle("/", authMiddleware(adminMux, redis))
 	middledMux := applyMiddlewares(baseMux)
 
 	v1 := http.NewServeMux()

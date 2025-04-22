@@ -17,7 +17,7 @@ type TrackHandler struct {
 }
 
 func NewTrackHandler(pool database.DBPool, trackMap map[string]chan bool, mut *sync.Mutex) *TrackHandler {
-	return &TrackHandler{pool: pool, trackMap: trackMap, mut: mut}
+	return &TrackHandler{pool, trackMap, mut}
 }
 
 func (t *TrackHandler) requireAuth() bool {

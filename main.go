@@ -67,10 +67,15 @@ func main() {
 	// serve http requests
 	dbPool := database.NewPool()
 	defer dbPool.Close()
+	redis := database.NewRedis()
+	defer redis.Close()
+
 	candleHandler := api.NewCandleHandler(dbPool)
 	trackHandler := api.NewTrackHandler(dbPool, trackMap, trackMut)
 	backfillHandler := api.NewBackfillHandler(dbPool, backfillMap, backfillMut)
-	server := api.GetServer(candleHandler, trackHandler, backfillHandler)
+	authHandler := api.NewAuthHandler(dbPool, redis)
+	handlers := []api.Handler{candleHandler, trackHandler, backfillHandler, authHandler}
+	server := api.GetServer(redis, handlers...)
 	server.ListenAndServe()
 
 	wg.Wait()
