@@ -50,7 +50,7 @@ type RedisClient struct {
 
 func NewRedis() RedisClient {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     "0.0.0.0:6379",
 		Password: "",
 		DB:       0,
 	})
