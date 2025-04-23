@@ -14,6 +14,10 @@ type AuthHandler struct {
 	rdb  database.RedisClient
 }
 
+func (t *AuthHandler) requireAuth() bool {
+	return false
+}
+
 func NewAuthHandler(pool database.DBPool, rdb database.RedisClient) *AuthHandler {
 	return &AuthHandler{pool, rdb}
 }
@@ -159,8 +163,4 @@ func (t *AuthHandler) handle(r *http.ServeMux) {
 	r.HandleFunc("POST /auth/register", t.register)
 	r.HandleFunc("POST /auth/login", t.login)
 	r.HandleFunc("GET /auth/logout", t.logout)
-}
-
-func (t *AuthHandler) requireAuth() bool {
-	return false
 }

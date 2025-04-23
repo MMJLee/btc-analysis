@@ -14,14 +14,14 @@ type User struct {
 
 func (repo DBPool) GetUser(c context.Context, username string) (User, error) {
 	query := `
-		SELECT username FROM auth 
+		SELECT username, password FROM auth 
 		WHERE username = $1 
 	`
 
 	rows, _ := repo.Pool.Query(c, query, username)
 	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[User])
 	if err != nil {
-		return user, fmt.Errorf("GetCandles-%w", err)
+		return user, fmt.Errorf("GetUser-%w", err)
 	}
 	return user, nil
 }
@@ -32,7 +32,7 @@ func (repo DBPool) CreateUser(c context.Context, username, password string) erro
 		VALUES ($1, $2)
 		ON CONFLICT DO NOTHING;
 	`
-	_, err := repo.Pool.Exec(c, query)
+	_, err := repo.Pool.Exec(c, query, username, password)
 	if err != nil {
 		return fmt.Errorf("CreateUser-%w", err)
 	}
